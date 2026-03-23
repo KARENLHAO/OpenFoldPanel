@@ -1,0 +1,5 @@
+biopython>=1.83
+cairosvg>=2.7.1
+gemmi>=0.6.7
+svgwrite>=1.4.3
+pytest>=8.0.0

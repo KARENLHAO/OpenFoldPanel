@@ -1,0 +1,65 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env
+.env.*
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Packaging artifacts
+build/
+dist/
+site/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.egg
+*.whl
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local workspace tooling
+.codex/
+.local/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python and QA local state
+.hypothesis/
+.pyre/
+.tox/
+.nox/
+
+# Local output, verification, and sample data
+out/
+out_*/
+verify_*/
+tmp/
+temp/
+data/
+
+# Vendored third-party source and build artifacts
+vendor/dssp/
+
+# Local ad-hoc assets
+Times New Roman.ttf
