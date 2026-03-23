@@ -55,7 +55,7 @@ class PanelLayout:
 def build_render_config(columns: int, font_size: int, msa_display_rows: int = 1) -> RenderConfig:
     """Build the shared render configuration from CLI parameters."""
 
-    cell_width = round(font_size * max(DEFAULT_CELL_WIDTH_RATIO, 0.92), 2)
+    cell_width = round(font_size * max(DEFAULT_CELL_WIDTH_RATIO, 1.08), 2)
     row_height = round(font_size * 1.42, 2)
     label_width = round(cell_width * DEFAULT_LABEL_COLUMNS, 2)
     return RenderConfig(
@@ -78,6 +78,7 @@ def build_rows(panel_data: JobPanelData) -> list[LayoutRow]:
     rows: list[LayoutRow] = []
     for index, model in enumerate(panel_data.models):
         rows.append(LayoutRow(kind="secondary", label=model.name, model_index=index))
+        rows.append(LayoutRow(kind="confidence", label="置信度", model_index=index))
 
     query_index = next((index for index, row in enumerate(panel_data.msa.rows) if row.is_query), 0)
     rows.append(LayoutRow(kind="msa_query", label="查询序列", msa_row_index=query_index))
@@ -186,7 +187,7 @@ def _estimate_label_width(rows: list[LayoutRow], config: RenderConfig) -> float:
 
 
 def _row_group(kind: str) -> str:
-    if kind == "secondary":
+    if kind in {"secondary", "confidence"}:
         return "secondary"
     if kind.startswith("msa_"):
         return "msa"
@@ -198,6 +199,8 @@ def _row_group(kind: str) -> str:
 def _row_height(kind: str, config: RenderConfig) -> float:
     if kind == "secondary":
         return round(config.font_size * 1.52, 2)
+    if kind == "confidence":
+        return round(max(config.font_size * 0.82, 8.4), 2)
     if kind.startswith("msa_"):
         return round(config.font_size * 1.54, 2)
     if kind in {"accessibility", "hydropathy"}:
@@ -206,13 +209,13 @@ def _row_height(kind: str, config: RenderConfig) -> float:
 
 
 def _row_spacing(kind: str, config: RenderConfig) -> float:
-    if kind in {"accessibility", "hydropathy"}:
+    if kind in {"confidence", "accessibility", "hydropathy"}:
         return 2.0
     return _section_gap(config, 0.08, 1.5)
 
 
 def _annotation_height(config: RenderConfig) -> float:
-    return 0.0
+    return round(max(config.font_size * 1.28, 15.0), 2)
 
 
 def _section_gap(config: RenderConfig, ratio: float, minimum: float) -> float:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tarfile
+from importlib import resources
 
 import pytest
 
@@ -40,17 +41,43 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "查询序列" in html_text
     assert "可及性" in html_text
     assert "疏水性" in html_text
-    assert "FoldScript 风格图板" in html_text
+    assert "置信度" in html_text
+    assert "OpenFoldPanel / ARCHIVE" in html_text
+    assert "FoldScript 风格图板" not in html_text
     assert "参考链选择" in html_text
-    assert "链摘要" in html_text
     assert "图例" in html_text
     assert "single_model_A" in html_text
     assert 'data-chain-select' in html_text
     assert 'data-report-page' in html_text
+    assert 'data-active-chain-panel' in html_text
+    assert 'data-figure-sheet' in html_text
+    assert 'data-summary-grid' in html_text
+    assert 'ofp-toolbar-summary' in html_text
+    assert 'id="ofp-report-payload"' in html_text
+    assert 'data-chain-templates' in html_text
+    assert 'template id="ofp-chain-A"' in html_text
+    assert 'template id="ofp-chain-B"' in html_text
+    assert 'data-chain-figure="A"' in html_text
+    assert 'data-chain-figure="B"' in html_text
     assert 'data-panel-width="' in html_text
     assert "--active-panel-width:" in html_text
-    assert 'class="figure-wrap"' in html_text
-    assert 'class="figure-sheet"' in html_text
+    assert 'ofp-figure-wrap figure-wrap' in html_text
+    assert 'ofp-figure-sheet figure-sheet' in html_text
+    assert 'data-legend-deck' in html_text
+    assert 'data-legend-card="structure"' in html_text
+    assert 'data-legend-card="tracks"' in html_text
+    assert 'data-legend-card="contacts"' in html_text
+    assert 'data-legend-kind="strand"' in html_text
+    assert 'data-legend-kind="helix"' in html_text
+    assert 'data-legend-kind="turn"' in html_text
+    assert 'data-legend-kind="confidence-very-high"' in html_text
+    assert 'data-legend-kind="contact-multi"' in html_text
+    assert 'data-current-chain-label' not in html_text
+    assert 'supporting-rail' not in html_text
+    assert html_text.index("OpenFoldPanel / ARCHIVE") < html_text.index('data-summary-grid')
+    assert html_text.index('data-figure-sheet') < html_text.index('data-legend-deck')
+    assert html_text.index('data-legend-deck') < html_text.index('data-chain-warnings')
+    assert "fetch(" not in html_text
     assert "导出当前链 PDF" not in html_text
     assert "下载 Tracks JSON" not in html_text
     assert "查看摘要" not in html_text
@@ -123,3 +150,12 @@ def test_cli_marks_partial_success_when_pdf_export_fails(tmp_path, monkeypatch):
     summary_text = (job_dir / "summary.txt").read_text()
     assert "Job Status: Partial Success" in summary_text
     assert "CairoSVG is not installed; PDF export was skipped." in summary_text
+
+
+def test_ui_resources_are_available_from_package():
+    ui_root = resources.files("openfoldpanel.UI")
+
+    assert ui_root.joinpath("report.template.html").is_file()
+    assert ui_root.joinpath("styles/tokens.css").is_file()
+    assert ui_root.joinpath("styles/figure.css").is_file()
+    assert ui_root.joinpath("scripts/report.js").is_file()

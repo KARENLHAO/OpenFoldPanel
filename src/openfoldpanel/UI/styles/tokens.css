@@ -1,0 +1,18 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --ofp-font-mono: "Liberation Mono", "Nimbus Mono PS", "Courier New", monospace;
+  --ofp-page-inline-pad: clamp(14px, 2.2vw, 28px);
+  --ofp-page-block-pad-top: clamp(24px, 4vw, 42px);
+  --ofp-page-block-pad-bottom: 52px;
+  --ofp-panel-readable-width: 760px;
+  --ofp-rail-width: 320px;
+  --ofp-layout-gap: 20px;
+  --ofp-surface-radius: 18px;
+  --ofp-card-radius: 16px;
+  --ofp-control-radius: 12px;
+  --ofp-shadow-soft: 0 18px 44px rgba(17, 31, 42, 0.08);
+  --ofp-shadow-card: 0 12px 28px rgba(17, 31, 42, 0.06);
+}

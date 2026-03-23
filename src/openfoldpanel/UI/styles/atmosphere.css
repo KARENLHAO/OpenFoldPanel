@@ -1,0 +1,53 @@
+.ofp-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ofp-atmosphere__svg {
+  width: 100%;
+  height: 100%;
+  color: var(--ofp-color-atmosphere);
+}
+
+.ofp-atmosphere__network,
+.ofp-atmosphere__helix,
+.ofp-atmosphere__guides {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+}
+
+.ofp-atmosphere__network {
+  opacity: 0.16;
+  stroke-width: 1.1;
+}
+
+.ofp-atmosphere__network circle {
+  fill: currentColor;
+  opacity: 0.26;
+  stroke: none;
+}
+
+.ofp-atmosphere__helix {
+  opacity: 0.14;
+}
+
+.ofp-atmosphere__guides {
+  opacity: 0.12;
+  stroke-dasharray: 4 10;
+}
+
+.ofp-atmosphere__sequence {
+  fill: currentColor;
+  opacity: 0.1;
+  font-family: var(--ofp-font-mono);
+  font-size: 18px;
+  letter-spacing: 0.14em;
+}
+
+.ofp-report {
+  z-index: 1;
+}

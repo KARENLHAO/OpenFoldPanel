@@ -1,0 +1,185 @@
+.ofp-eyebrow,
+.eyebrow {
+  margin: 0;
+  color: var(--ofp-color-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ofp-title,
+.title {
+  margin: 0;
+  font-family: var(--ofp-font-serif);
+  font-size: clamp(1.42rem, 2vw, 1.8rem);
+  line-height: 1.15;
+  color: var(--ofp-color-accent);
+}
+
+.ofp-toolbar-summary {
+  padding: 14px 16px;
+  border: 1px solid rgba(147, 186, 180, 0.45);
+  border-radius: 14px;
+  background: rgba(247, 250, 249, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.ofp-chain-control,
+.chain-control {
+  display: grid;
+  gap: 8px;
+}
+
+.ofp-chain-label,
+.chain-label {
+  margin: 0;
+  color: var(--ofp-color-muted);
+  font-size: 0.8rem;
+}
+
+.ofp-chain-select,
+.chain-select {
+  appearance: none;
+  min-width: 232px;
+  border: 1px solid var(--ofp-color-border-strong);
+  border-radius: var(--ofp-control-radius);
+  background-color: rgba(252, 253, 251, 0.98);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M3 5.5 7 9l4-3.5' fill='none' stroke='%23586e77' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+  color: var(--ofp-color-text);
+  padding: 10px 36px 10px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.ofp-stage-frame {
+  border: 1px solid var(--ofp-color-border);
+  border-radius: var(--ofp-surface-radius);
+  background: rgba(252, 253, 251, 0.95);
+  box-shadow: var(--ofp-shadow-soft);
+  overflow: hidden;
+}
+
+.ofp-rail-card,
+.rail-card,
+.ofp-global-notes,
+.global-notes {
+  border: 1px solid var(--ofp-color-border);
+  border-radius: var(--ofp-card-radius);
+  background: rgba(252, 253, 251, 0.96);
+  box-shadow: var(--ofp-shadow-card);
+}
+
+.ofp-global-notes,
+.global-notes {
+  margin-top: 18px;
+}
+
+.ofp-rail-card summary,
+.rail-card summary,
+.ofp-global-notes summary,
+.global-notes summary,
+.ofp-rail-card-title,
+.rail-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px 12px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ofp-color-text);
+}
+
+.ofp-rail-card summary,
+.rail-card summary,
+.ofp-global-notes summary,
+.global-notes summary {
+  cursor: pointer;
+}
+
+.ofp-rail-card summary::after,
+.rail-card summary::after,
+.ofp-global-notes summary::after,
+.global-notes summary::after {
+  content: "+";
+  color: var(--ofp-color-muted);
+  font-weight: 400;
+}
+
+.ofp-rail-card[open] summary::after,
+.rail-card[open] summary::after,
+.ofp-global-notes[open] summary::after,
+.global-notes[open] summary::after {
+  content: "−";
+}
+
+.ofp-rail-body,
+.rail-body {
+  padding: 0 16px 16px;
+}
+
+.ofp-summary-grid,
+.summary-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.ofp-summary-grid--toolbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.ofp-summary-item,
+.summary-item {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(140, 160, 170, 0.22);
+}
+
+.ofp-summary-item:last-child,
+.summary-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.ofp-summary-grid--toolbar .ofp-summary-item,
+.ofp-summary-grid--toolbar .summary-item {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.ofp-summary-label,
+.summary-label {
+  color: var(--ofp-color-muted);
+  font-size: 0.84rem;
+}
+
+.ofp-summary-value,
+.summary-value {
+  color: var(--ofp-color-text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ofp-global-notes ul,
+.global-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
+  color: var(--ofp-color-text);
+}
+
+.ofp-global-notes li + li,
+.global-notes li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 720px) {
+  .ofp-summary-grid--toolbar {
+    grid-template-columns: 1fr;
+  }
+}

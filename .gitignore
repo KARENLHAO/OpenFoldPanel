@@ -58,6 +58,16 @@ tmp/
 temp/
 data/
 
+# Generated OpenFoldPanel report artifacts
+report.html
+tracks.json
+summary.txt
+logs.txt
+reference-chain-*.pdf
+reference-chain-*.png
+panel.svg
+panel.png
+
 # Vendored third-party source and build artifacts
 vendor/dssp/
 

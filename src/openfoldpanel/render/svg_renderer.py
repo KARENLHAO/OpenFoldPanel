@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
 
+from openfoldpanel.constants import PLDDT_THRESHOLDS
 from openfoldpanel.models import ContactEntry, JobPanelData, SecondaryStructureEntry
 from openfoldpanel.render.glyphs import helix_path, strand_points, turn_path
 from openfoldpanel.render.layout import LayoutBlock, LayoutRow, PanelLayout, build_panel_layout
@@ -67,10 +68,11 @@ def _style_block(config) -> str:
         f'.model-label{{font-family:{sequence_font};font-size:{config.font_size + 0.5}px;fill:{config.colors["strand_fill"]};font-style:italic;font-weight:700;}}'
         f'.track-label{{font-family:{config.font_family};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-style:italic;font-weight:700;}}'
         f'.homolog-label{{font-family:{config.font_family};font-size:{config.font_size - 0.3}px;fill:{config.colors["text"]};font-weight:600;}}'
-        f'.annotation-label{{font-family:{config.heading_font_family};font-size:{config.font_size + 1}px;font-weight:700;}}'
+        f'.annotation-label{{font-family:{config.heading_font_family};font-size:{config.font_size + 1.2}px;font-weight:700;}}'
         f'.tick-label{{font-family:{sequence_font};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-weight:700;}}'
-        f'.sequence-text{{font-family:{sequence_font};font-size:{config.font_size + 0.2}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
-        f'.contact-text{{font-family:{sequence_font};font-size:{config.font_size + 0.2}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
+        f'.sequence-text{{font-family:{sequence_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
+        f'.contact-text{{font-family:{sequence_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
+        '.confidence-cell{shape-rendering:crispEdges;}'
         f'.turn-track{{fill:none;stroke:{config.colors["turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
         f'.soft-rule{{stroke:{config.colors["grid"]};stroke-width:0.9;}}'
         "</style>"
@@ -82,6 +84,7 @@ def _render_block(panel_data: JobPanelData, layout: PanelLayout, block: LayoutBl
     grid_x = config.margin + config.label_width
     pieces = [f'<g transform="translate({block.x:.2f},{block.y:.2f})">']
 
+    pieces.append(_render_structure_annotation(panel_data, block, layout))
     pieces.append(_render_sequence_ticks(panel_data, block, layout))
 
     for row, y, height in zip(layout.rows, layout.row_positions, layout.row_heights, strict=True):
@@ -108,30 +111,21 @@ def _render_structure_annotation(panel_data: JobPanelData, block: LayoutBlock, l
     config = layout.render_config
     grid_x = config.margin + config.label_width
     band_y = layout.annotation_y
-    glyph_y = band_y + config.font_size + 5
-    glyph_height = max(config.font_size * 0.72, 8.2)
     pieces: list[str] = []
     for segment in _secondary_annotations(panel_data.models[0].secondary_structure):
         if segment.end <= block.start or segment.start >= block.end:
             continue
         clipped_start = max(segment.start, block.start)
         clipped_end = min(segment.end, block.end)
-        padding = min(max(config.cell_width * 0.18, 0.8), 1.6)
-        x = grid_x + (clipped_start - block.start) * config.cell_width + padding
-        width = max((clipped_end - clipped_start) * config.cell_width - padding * 2, config.cell_width * 0.72)
+        x = grid_x + (clipped_start - block.start) * config.cell_width
+        width = (clipped_end - clipped_start) * config.cell_width
         label_x = x + width / 2.0
         color = _structure_color(segment.category, config.colors)
-        pieces.append(f'<text class="annotation-label" x="{label_x:.2f}" y="{band_y + config.font_size:.2f}" fill="{color}" text-anchor="middle">{html.escape(segment.label)}</text>')
-        pieces.append(_render_annotation_glyph(segment.category, x, glyph_y, width, glyph_height, config.colors))
+        pieces.append(
+            f'<text class="annotation-label" x="{label_x:.2f}" y="{band_y + config.font_size + 1.4:.2f}" '
+            f'fill="{color}" text-anchor="middle">{html.escape(segment.label)}</text>'
+        )
     return "\n".join(pieces)
-
-
-def _render_annotation_glyph(category: str, x: float, y: float, width: float, height: float, colors: dict[str, str]) -> str:
-    if category == "strand":
-        return f'<polygon points="{strand_points(x, y, width, height)}" fill="{colors["strand_fill"]}" stroke="{colors["strand_stroke"]}" stroke-width="0.8"/>'
-    if category == "helix":
-        return f'<path d="{helix_path(x, y, width, height)}" fill="none" stroke="{colors["helix_fill"]}" stroke-width="1.8"/>'
-    return f'<path class="turn-track" d="{turn_path(x, y, width, height * 0.9)}"/>'
 
 
 def _render_sequence_ticks(panel_data: JobPanelData, block: LayoutBlock, layout: PanelLayout) -> str:
@@ -191,6 +185,8 @@ def _tick_label_bounds(candidate: TickCandidate, font_size: int) -> tuple[float,
 def _render_row(panel_data: JobPanelData, row: LayoutRow, block: LayoutBlock, y: float, height: float, layout: PanelLayout) -> str:
     if row.kind == "secondary":
         return _render_secondary_row(panel_data, row.model_index, block, y, height, layout)
+    if row.kind == "confidence":
+        return _render_confidence_row(panel_data, row.model_index, block, y, height, layout)
     if row.kind in {"msa_query", "msa_homolog"}:
         return _render_msa_row(panel_data, row, block, y, height, layout)
     if row.kind == "accessibility":
@@ -243,6 +239,24 @@ def _render_secondary_row(panel_data: JobPanelData, model_index: int | None, blo
     return "\n".join(pieces)
 
 
+def _render_confidence_row(panel_data: JobPanelData, model_index: int | None, block: LayoutBlock, y: float, height: float, layout: PanelLayout) -> str:
+    if model_index is None:
+        return ""
+    config = layout.render_config
+    grid_x = config.margin + config.label_width
+    plddt = panel_data.models[model_index].plddt
+    pieces: list[str] = []
+    for local_index, axis_index in enumerate(range(block.start, block.end)):
+        if axis_index >= len(plddt):
+            continue
+        x = grid_x + local_index * config.cell_width
+        color = _plddt_color(plddt[axis_index], config.colors)
+        pieces.append(
+            f'<rect class="confidence-cell" x="{x:.2f}" y="{y + 1.0:.2f}" width="{config.cell_width:.2f}" height="{height - 2.0:.2f}" fill="{color}" stroke="none"/>'
+        )
+    return "\n".join(pieces)
+
+
 def _render_msa_row(panel_data: JobPanelData, row: LayoutRow, block: LayoutBlock, y: float, height: float, layout: PanelLayout) -> str:
     if row.msa_row_index is None or row.msa_row_index >= len(panel_data.msa.rows):
         return ""
@@ -257,9 +271,9 @@ def _render_msa_row(panel_data: JobPanelData, row: LayoutRow, block: LayoutBlock
         residue = msa_row.sequence[axis_index]
         query_residue = query_row.sequence[axis_index] if axis_index < len(query_row.sequence) else residue
         x = grid_x + local_index * config.cell_width
-        bg_color, text_color = _msa_style(residue, query_residue, row.kind)
+        bg_color, text_color = _msa_style(residue, query_residue, row.kind, config.colors)
         pieces.append(
-            f'<rect x="{x:.2f}" y="{y + 0.8:.2f}" width="{config.cell_width:.2f}" height="{height - 1.6:.2f}" fill="{bg_color}" stroke="#e5e5e5" stroke-width="0.45"/>'
+            f'<rect x="{x:.2f}" y="{y + 0.8:.2f}" width="{config.cell_width:.2f}" height="{height - 1.6:.2f}" fill="{bg_color}" stroke="{config.colors["grid"]}" stroke-width="0.45"/>'
         )
         pieces.append(
             f'<text class="sequence-text" x="{x + config.cell_width / 2.0:.2f}" y="{y + height / 2.0 + 0.35:.2f}" fill="{text_color}">{html.escape(residue)}</text>'
@@ -277,7 +291,7 @@ def _render_accessibility_row(panel_data: JobPanelData, block: LayoutBlock, y: f
             continue
         entry = track[axis_index]
         x = grid_x + local_index * config.cell_width
-        color = _accessibility_color(entry.category)
+        color = _accessibility_color(entry.category, config.colors)
         pieces.append(
             f'<rect x="{x:.2f}" y="{y + 1.0:.2f}" width="{config.cell_width:.2f}" height="{height - 2.0:.2f}" fill="{color}" stroke="none"/>'
         )
@@ -294,7 +308,7 @@ def _render_hydropathy_row(panel_data: JobPanelData, block: LayoutBlock, y: floa
         entry = panel_data.hydropathy[axis_index]
         x = grid_x + local_index * config.cell_width
         pieces.append(
-            f'<rect x="{x:.2f}" y="{y + 1.0:.2f}" width="{config.cell_width:.2f}" height="{height - 2.0:.2f}" fill="{_hydropathy_color(entry.category)}" stroke="none"/>'
+            f'<rect x="{x:.2f}" y="{y + 1.0:.2f}" width="{config.cell_width:.2f}" height="{height - 2.0:.2f}" fill="{_hydropathy_color(entry.category, config.colors)}" stroke="none"/>'
         )
     return "\n".join(pieces)
 
@@ -313,7 +327,7 @@ def _render_contacts_row(panel_data: JobPanelData, model_index: int | None, bloc
         x = grid_x + local_index * config.cell_width
         if entry.symbol:
             pieces.append(
-                f'<rect x="{x + 0.2:.2f}" y="{y + 0.7:.2f}" width="{config.cell_width - 0.4:.2f}" height="{height - 1.4:.2f}" fill="#fff7c7" stroke="none"/>'
+                f'<rect x="{x + 0.2:.2f}" y="{y + 0.7:.2f}" width="{config.cell_width - 0.4:.2f}" height="{height - 1.4:.2f}" fill="{config.colors["contact_bg"]}" stroke="none"/>'
             )
             pieces.append(_render_contact_symbol(entry, x, y, height, config))
         elif entry.is_multi_contact:
@@ -340,18 +354,18 @@ def _render_contact_symbol(entry: ContactEntry, x: float, y: float, height: floa
 
 def _secondary_annotations(track: list[SecondaryStructureEntry]) -> list[StructureAnnotation]:
     annotations: list[StructureAnnotation] = []
-    counters = {"strand": 0, "helix": 0, "turn": 0}
+    counters = {"strand": 0, "helix": 0}
     index = 0
     while index < len(track):
         category = track[index].category
-        if category not in {"strand", "helix", "turn"}:
+        if category not in {"strand", "helix"}:
             index += 1
             continue
         end = index + 1
         while end < len(track) and track[end].category == category:
             end += 1
         counters[category] += 1
-        symbol = {"strand": "β", "helix": "α", "turn": "η"}[category]
+        symbol = {"strand": "β", "helix": "α"}[category]
         annotations.append(StructureAnnotation(category=category, start=index, end=end, label=f"{symbol}{counters[category]}"))
         index = end
     return annotations
@@ -365,31 +379,43 @@ def _structure_color(category: str, colors: dict[str, str]) -> str:
     return colors["turn_text"]
 
 
-def _msa_style(residue: str, query_residue: str, kind: str) -> tuple[str, str]:
+def _msa_style(residue: str, query_residue: str, kind: str, colors: dict[str, str]) -> tuple[str, str]:
     if kind == "msa_query":
-        return "#ff2020", "#fff58c"
+        return colors["msa_query_bg"], colors["msa_query_text"]
     if residue == query_residue:
-        return "#ff2020", "#fff58c"
+        return colors["msa_identity_bg"], colors["msa_identity_text"]
     if compatible_similarity_group({residue, query_residue}):
-        return "#fff0b5", "#cc2f00"
-    return "#ffffff", "#222222"
+        return colors["msa_similar_bg"], colors["msa_similar_text"]
+    return colors["msa_default_bg"], colors["msa_default_text"]
 
 
-def _accessibility_color(category: str | None) -> str:
+def _accessibility_color(category: str | None, colors: dict[str, str]) -> str:
     if category == "buried":
-        return "#2536d2"
+        return colors["accessibility_buried"]
     if category == "intermediate":
-        return "#77d0ff"
+        return colors["accessibility_intermediate"]
     if category == "accessible":
-        return "#1ce8ff"
+        return colors["accessibility_accessible"]
     if category == "highly_exposed":
-        return "#0000a8"
-    return "#ebebeb"
+        return colors["accessibility_highly_exposed"]
+    return colors["coil"]
 
 
-def _hydropathy_color(category: str | None) -> str:
+def _hydropathy_color(category: str | None, colors: dict[str, str]) -> str:
     if category == "hydrophobic":
-        return "#e100ff"
+        return colors["hydropathy_hydrophobic"]
     if category == "hydrophilic":
-        return "#1ce8df"
-    return "#e5e5e5"
+        return colors["hydropathy_hydrophilic"]
+    return colors["hydropathy_intermediate"]
+
+
+def _plddt_color(value: float | None, colors: dict[str, str]) -> str:
+    if value is None:
+        return colors["coil"]
+    if value >= PLDDT_THRESHOLDS["very_high"]:
+        return colors["plddt_very_high"]
+    if value >= PLDDT_THRESHOLDS["confident"]:
+        return colors["plddt_confident"]
+    if value >= PLDDT_THRESHOLDS["low"]:
+        return colors["plddt_low"]
+    return colors["plddt_very_low"]

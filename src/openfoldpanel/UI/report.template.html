@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__OFP_PAGE_TITLE__</title>
+    <style id="ofp-theme-tokens">
+:root {
+__OFP_THEME_VARS__
+}
+    </style>
+    <style id="ofp-inline-styles">
+__OFP_INLINE_STYLES__
+    </style>
+  </head>
+  <body>
+    <div class="ofp-atmosphere" aria-hidden="true">
+      <svg class="ofp-atmosphere__svg" viewBox="0 0 1600 1100" focusable="false">
+        <g class="ofp-atmosphere__network">
+          <path d="M 1180 120 L 1340 220 L 1268 384 L 1088 356 L 1040 200 Z" />
+          <path d="M 160 760 L 308 664 L 486 744 L 472 930 L 280 986 L 142 900 Z" />
+          <circle cx="1180" cy="120" r="8" />
+          <circle cx="1340" cy="220" r="7" />
+          <circle cx="1268" cy="384" r="7" />
+          <circle cx="1088" cy="356" r="6" />
+          <circle cx="1040" cy="200" r="6" />
+          <circle cx="160" cy="760" r="7" />
+          <circle cx="308" cy="664" r="6" />
+          <circle cx="486" cy="744" r="7" />
+          <circle cx="472" cy="930" r="6" />
+          <circle cx="280" cy="986" r="8" />
+          <circle cx="142" cy="900" r="6" />
+        </g>
+        <g class="ofp-atmosphere__helix">
+          <path d="M 120 180 C 192 116 274 116 346 180 C 418 244 500 244 572 180 C 644 116 726 116 798 180" />
+          <path d="M 120 240 C 192 304 274 304 346 240 C 418 176 500 176 572 240 C 644 304 726 304 798 240" />
+          <path d="M 962 774 C 1030 724 1098 724 1166 774 C 1234 824 1302 824 1370 774 C 1438 724 1506 724 1574 774" />
+          <path d="M 962 826 C 1030 876 1098 876 1166 826 C 1234 776 1302 776 1370 826 C 1438 876 1506 876 1574 826" />
+          <line x1="170" y1="190" x2="170" y2="230" />
+          <line x1="270" y1="164" x2="270" y2="256" />
+          <line x1="370" y1="164" x2="370" y2="256" />
+          <line x1="470" y1="190" x2="470" y2="230" />
+          <line x1="1070" y1="780" x2="1070" y2="820" />
+          <line x1="1170" y1="758" x2="1170" y2="842" />
+          <line x1="1270" y1="758" x2="1270" y2="842" />
+          <line x1="1370" y1="780" x2="1370" y2="820" />
+        </g>
+        <g class="ofp-atmosphere__sequence">
+          <text x="1050" y="120">GLY  ALA  ASN  SER  TYR  LEU  CYS  GLU</text>
+          <text x="94" y="620">A T G C C A U G A A C C U G A C</text>
+          <text x="1066" y="948">β-strand  helix  contact  pLDDT  accessibility</text>
+        </g>
+        <g class="ofp-atmosphere__guides">
+          <line x1="86" y1="128" x2="510" y2="128" />
+          <line x1="1194" y1="980" x2="1508" y2="980" />
+          <line x1="1030" y1="456" x2="1524" y2="456" />
+          <line x1="184" y1="1018" x2="616" y2="1018" />
+        </g>
+      </svg>
+    </div>
+
+    <main
+      class="ofp-report page"
+      data-report-page
+      data-default-chain="__OFP_DEFAULT_CHAIN_ID__"
+      style="--active-panel-width: __OFP_DEFAULT_PANEL_WIDTH__px;"
+    >
+      <section class="ofp-toolbar toolbar" aria-label="图板控制区">
+        <div class="ofp-toolbar-copy toolbar-copy">
+          <p class="ofp-eyebrow eyebrow">OpenFoldPanel / ARCHIVE</p>
+          <section class="ofp-toolbar-summary" aria-label="当前链摘要">
+            <div class="ofp-summary-grid ofp-summary-grid--toolbar summary-grid" data-summary-grid></div>
+          </section>
+        </div>
+
+        <label class="ofp-chain-control chain-control">
+          <span class="ofp-chain-label chain-label">参考链选择</span>
+          <select class="ofp-chain-select chain-select" data-chain-select aria-label="参考链选择器"></select>
+        </label>
+      </section>
+
+      <section class="ofp-chain-stage chain-stack" aria-label="参考链图板">
+        <article
+          class="ofp-chain-report chain-report is-active"
+          data-active-chain-panel
+          data-panel-width="__OFP_DEFAULT_PANEL_WIDTH__"
+          style="--panel-width: __OFP_DEFAULT_PANEL_WIDTH__px;"
+        >
+          <div class="ofp-chain-layout chain-layout">
+            <section class="ofp-main-stage main-stage">
+              <div class="ofp-stage-frame">
+                <div class="ofp-figure-wrap figure-wrap">
+                  <div class="ofp-figure-sheet figure-sheet" data-figure-sheet></div>
+                </div>
+              </div>
+
+              <section class="ofp-legend-deck" data-legend-deck aria-label="图例">
+                <section class="ofp-legend-card ofp-rail-card rail-card" data-legend-card="structure">
+                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">结构</h2>
+                  <div class="ofp-rail-body rail-body">
+                    <section class="ofp-legend-group legend-group">
+                      <h3 class="ofp-legend-group-title legend-group-title">二级结构</h3>
+                      <div class="ofp-legend-items legend-items">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="helix">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 60 20" aria-hidden="true">
+                              <path class="ofp-legend-helix" d="M 4 10 Q 10 3 16 10 Q 22 17 28 10 Q 34 3 40 10 Q 46 17 52 10" />
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>螺旋</strong>
+                            <small>α-螺旋类二级结构单元。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="strand">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 60 20" aria-hidden="true">
+                              <polygon class="ofp-legend-strand" points="4,6 40,6 40,2 56,10 40,18 40,14 4,14" />
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>折叠片</strong>
+                            <small>β-折叠片，并体现链段延伸方向。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="turn">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 60 20" aria-hidden="true">
+                              <path class="ofp-legend-turn" d="M 6 10 Q 11 6 16 10 Q 21 14 26 10 Q 31 6 36 10 Q 41 14 46 10 Q 51 6 54 10" />
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>转角</strong>
+                            <small>连接不同二级结构单元的转角区域。</small>
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </section>
+
+                <section class="ofp-legend-card ofp-rail-card rail-card" data-legend-card="tracks">
+                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">轨道</h2>
+                  <div class="ofp-rail-body rail-body">
+                    <section class="ofp-legend-group legend-group">
+                      <h3 class="ofp-legend-group-title legend-group-title">序列与理化轨道</h3>
+                      <div class="ofp-legend-items legend-items">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="msa-query">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-sequence-cell is-query">A</span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>查询序列</strong>
+                            <small>表示目标序列在当前位置的残基字母单元格。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="msa-identity">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-sequence-cell is-identity">A</span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>完全匹配</strong>
+                            <small>表示该位点残基与查询序列残基完全相同。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="msa-similar">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-sequence-cell is-similar">S</span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>相似替换</strong>
+                            <small>表示该位点发生了保守替换，残基性质相近但不完全相同。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="accessibility">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-strip">
+                              <span class="ofp-track-cell is-accessibility-buried"></span>
+                              <span class="ofp-track-cell is-accessibility-accessible"></span>
+                            </span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>可及性</strong>
+                            <small>用区分残基处于埋藏状态还是暴露状态，反映表面可接近程度。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-strip">
+                              <span class="ofp-track-cell is-hydrophobic"></span>
+                              <span class="ofp-track-cell is-hydrophilic"></span>
+                            </span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>疏水性</strong>
+                            <small>表示残基的疏水或亲水特征，体现局部理化性质分布。</small>
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="ofp-legend-group legend-group">
+                      <h3 class="ofp-legend-group-title legend-group-title">置信度轨道</h3>
+                      <div class="ofp-legend-items legend-items">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="confidence-very-high">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-strip">
+                              <span class="ofp-track-cell is-confidence-very-high"></span>
+                              <span class="ofp-track-cell is-confidence-very-high"></span>
+                              <span class="ofp-track-cell is-confidence-very-high"></span>
+                            </span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>很高</strong>
+                            <small>pLDDT ≥ 90，说明该区域结构预测可信度很高。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="confidence-confident">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-strip">
+                              <span class="ofp-track-cell is-confidence-confident"></span>
+                              <span class="ofp-track-cell is-confidence-confident"></span>
+                              <span class="ofp-track-cell is-confidence-confident"></span>
+                            </span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>可信</strong>
+                            <small>70 ≤ pLDDT &lt; 90，说明该区域预测整体较可靠。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="confidence-low">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-strip">
+                              <span class="ofp-track-cell is-confidence-low"></span>
+                              <span class="ofp-track-cell is-confidence-low"></span>
+                              <span class="ofp-track-cell is-confidence-low"></span>
+                            </span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>偏低</strong>
+                            <small>50 ≤ pLDDT &lt; 70，说明该区域预测可信度有限，需要谨慎解释。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="confidence-very-low">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-strip">
+                              <span class="ofp-track-cell is-confidence-very-low"></span>
+                              <span class="ofp-track-cell is-confidence-very-low"></span>
+                              <span class="ofp-track-cell is-confidence-very-low"></span>
+                            </span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>很低</strong>
+                            <small>pLDDT &lt; 50，说明该区域结构不稳定或预测不可靠。</small>
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </section>
+
+                <section class="ofp-legend-card ofp-rail-card rail-card" data-legend-card="contacts">
+                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">接触</h2>
+                  <div class="ofp-rail-body rail-body">
+                    <section class="ofp-legend-group legend-group">
+                      <h3 class="ofp-legend-group-title legend-group-title">接触强度与符号</h3>
+                      <div class="ofp-legend-items legend-items">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-strong">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-strong" x="10" y="13">A</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>强蛋白链接触</strong>
+                            <small>表示较强的蛋白质残基间相互作用。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-weak">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-weak" x="10" y="13">B</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>弱蛋白链接触</strong>
+                            <small>表示较弱的蛋白质残基间相互作用。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-same-position">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-strong" x="10" y="13">#</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>同位点蛋白链接触</strong>
+                            <small>表示接触双方残基编号相同且残基类型一致。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-ion">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-strong" x="10" y="13">+</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>离子</strong>
+                            <small>表示与离子分子发生接触。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-nucleic-acid">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-weak" x="10" y="13">*</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>核酸</strong>
+                            <small>表示与核酸分子发生接触。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-porphyrin">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-strong" x="10" y="13">:</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>卟啉样配体</strong>
+                            <small>表示与卟啉或相近类型的大环配体发生接触。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-sugar">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-weak" x="10" y="13">&quot;</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>糖基</strong>
+                            <small>表示与糖类配体发生接触。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-other-ligand">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-strong" x="10" y="13">^</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>其他配体</strong>
+                            <small>表示与非蛋白、非核酸、非糖类的其他异质分子发生接触。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-multi">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <rect class="ofp-legend-contact-outline" x="2.5" y="2.5" width="15" height="15" />
+                              <text class="ofp-legend-contact-text is-weak" x="10" y="13">A</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>多重接触</strong>
+                            <small>表示同一位点同时存在多种类型的接触关系。</small>
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </section>
+              </section>
+
+              <details class="ofp-global-notes global-notes" data-chain-warnings hidden>
+                <summary data-chain-warnings-title>当前链提示</summary>
+                <div class="ofp-rail-body rail-body">
+                  <ul data-chain-warning-list></ul>
+                </div>
+              </details>
+            </section>
+          </div>
+        </article>
+      </section>
+
+      <details class="ofp-global-notes global-notes" data-job-warnings hidden>
+        <summary data-job-warnings-title>任务级提示</summary>
+        <div class="ofp-rail-body rail-body">
+          <ul data-job-warning-list></ul>
+        </div>
+      </details>
+    </main>
+
+    <section hidden aria-hidden="true" data-chain-templates>
+__OFP_CHAIN_TEMPLATES__
+    </section>
+
+    <script id="ofp-report-payload" type="application/json">
+__OFP_REPORT_PAYLOAD__
+    </script>
+    <script>
+__OFP_INLINE_SCRIPT__
+    </script>
+  </body>
+</html>
