@@ -40,6 +40,14 @@ from openfoldpanel.utils.text import humanize_model_name, safe_chain_slug
 def run_pipeline(config: PipelineConfig, logger: logging.Logger) -> dict[str, int]:
     """Run the full batch pipeline and return a status summary."""
 
+    logger.info(
+        "Starting OpenFoldPanel run: input=%s outdir=%s chain=%s max_homologs_displayed=%s evalue=%s",
+        config.input_path,
+        config.outdir,
+        config.chain,
+        config.max_homologs_displayed,
+        config.evalue,
+    )
     validate_input_path(config.input_path)
     ensure_directory(config.outdir)
 
@@ -47,14 +55,17 @@ def run_pipeline(config: PipelineConfig, logger: logging.Logger) -> dict[str, in
     try:
         if is_supported_archive(config.input_path):
             extracted_root = temp_dir / "archive"
+            logger.info("Extracting archive input to %s", extracted_root)
             extract_archive(config.input_path, extracted_root)
             jobs = discover_jobs_from_extracted_root(extracted_root, logger)
         else:
+            logger.info("Discovering job from structure input %s", config.input_path)
             jobs = discover_jobs_from_structure(config.input_path)
 
+        logger.info("Discovered %s job(s) to process", len(jobs))
         results: list[JobRunResult] = []
-        for job in jobs:
-            results.append(_run_job(job, config, logger, temp_dir))
+        for job_index, job in enumerate(jobs, start=1):
+            results.append(_run_job(job, config, logger, temp_dir, job_index=job_index, total_jobs=len(jobs)))
 
         return {
             "total_jobs": len(results),
@@ -64,24 +75,41 @@ def run_pipeline(config: PipelineConfig, logger: logging.Logger) -> dict[str, in
         }
     finally:
         if not config.keep_temp:
+            logger.info("Cleaning up temporary workspace %s", temp_dir)
             safe_rmtree(temp_dir)
+        else:
+            logger.info("Keeping temporary workspace at %s", temp_dir)
 
 
-def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path) -> JobRunResult:
+def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path, *, job_index: int, total_jobs: int) -> JobRunResult:
     output_dir = ensure_directory(config.outdir / job.name)
     log_path = output_dir / "logs.txt"
     file_handler = attach_file_logger(logger, log_path)
     warnings: list[str] = list(job.ignored_files)
     partial_reasons: list[str] = []
     try:
+        logger.info(
+            "[Job %s/%s] Starting %s (%s structure file(s))",
+            job_index,
+            total_jobs,
+            job.name,
+            len(job.structure_files),
+        )
         if not job.structure_files:
             result = JobRunResult(job_name=job.name, status="failed", output_dir=str(output_dir), error="No structure files found.")
             write_summary(result, None, output_dir / "summary.txt")
             return result
 
         parsed_structures = []
-        for structure_path in job.structure_files:
-            logger.info("Parsing %s for job %s", structure_path.name, job.name)
+        for structure_index, structure_path in enumerate(job.structure_files, start=1):
+            logger.info(
+                "[Job %s/%s] Parsing model %s/%s: %s",
+                job_index,
+                total_jobs,
+                structure_index,
+                len(job.structure_files),
+                structure_path.name,
+            )
             try:
                 parsed_structures.append(parse_structure(structure_path, logger))
             except Exception as exc:
@@ -101,13 +129,34 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
             write_summary(result, None, output_dir / "summary.txt")
             return result
 
+        logger.info(
+            "[Job %s/%s] Parsed %s/%s model(s) successfully",
+            job_index,
+            total_jobs,
+            len(parsed_structures),
+            len(job.structure_files),
+        )
         reference_structure = parsed_structures[0]
         default_reference_chain = select_reference_chain(reference_structure, "AUTO")
         requested_reference_chains = collect_reference_chains(reference_structure, config.chain)
-        render_config = build_render_config(config.columns, config.font_size, config.msa_display_rows)
+        render_config = build_render_config(config.columns, config.font_size, config.max_homologs_displayed)
+        logger.info(
+            "[Job %s/%s] Rendering reference chains: %s",
+            job_index,
+            total_jobs,
+            ", ".join(requested_reference_chains),
+        )
 
         chain_panels: list[JobPanelData] = []
-        for reference_chain_id in requested_reference_chains:
+        for chain_index, reference_chain_id in enumerate(requested_reference_chains, start=1):
+            logger.info(
+                "[Job %s/%s] Building chain %s (%s/%s)",
+                job_index,
+                total_jobs,
+                reference_chain_id,
+                chain_index,
+                len(requested_reference_chains),
+            )
             panel_data, chain_partial_reasons = _build_panel_data_for_reference_chain(
                 parsed_structures=parsed_structures,
                 reference_chain_id=reference_chain_id,
@@ -115,6 +164,7 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
                 render_config=render_config,
                 workdir=temp_dir / job.name / safe_chain_slug(reference_chain_id),
                 logger=logger,
+                job_name=job.name,
             )
             if panel_data is None:
                 warning = f"Skipped {reference_chain_id}: no compatible models could be mapped to the reference axis."
@@ -153,6 +203,12 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
         artifacts = []
         for panel_data in chain_panels:
             pdf_path = output_dir / reference_chain_pdf_name(panel_data.reference_chain)
+            logger.info(
+                "[Job %s/%s] Rendering report SVG and exporting PDF for chain %s",
+                job_index,
+                total_jobs,
+                panel_data.reference_chain,
+            )
             report_svg = render_reference_chain_report_svg(job.name, panel_data, default_reference_chain)
             pdf_ok, pdf_warning = export_pdf(report_svg, pdf_path)
             if pdf_ok:
@@ -165,10 +221,12 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
         report_data.status = job_status
 
         html_path = output_dir / "report.html"
-        html_path.write_text(render_html_report(report_data), encoding="utf-8")
+        logger.info("[Job %s/%s] Writing HTML report to %s", job_index, total_jobs, html_path)
+        html_path.write_text(render_html_report(report_data, config), encoding="utf-8")
         artifacts.append(html_path.name)
 
         json_path = output_dir / "tracks.json"
+        logger.info("[Job %s/%s] Writing tracks JSON to %s", job_index, total_jobs, json_path)
         write_tracks_json(report_data, json_path)
         artifacts.append(json_path.name)
         artifacts.append("summary.txt")
@@ -180,7 +238,9 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
             warnings=warnings,
             artifacts=artifacts,
         )
+        logger.info("[Job %s/%s] Writing summary to %s", job_index, total_jobs, output_dir / "summary.txt")
         write_summary(result, report_data, output_dir / "summary.txt")
+        logger.info("[Job %s/%s] Finished %s with status=%s", job_index, total_jobs, job.name, job_status)
         return result
     except Exception as exc:
         logger.exception("Job %s failed", job.name)
@@ -205,16 +265,27 @@ def _build_panel_data_for_reference_chain(
     render_config,
     workdir: Path,
     logger: logging.Logger,
+    job_name: str,
 ) -> tuple[JobPanelData | None, list[str]]:
     reference_structure = parsed_structures[0]
     reference_chain = reference_structure.chains[reference_chain_id]
+    logger.info("Job %s / Chain %s: building sequence axis (%s residues)", job_name, reference_chain_id, len(reference_chain.residues))
     axis = build_sequence_axis(reference_chain)
+    logger.info("Job %s / Chain %s: computing hydropathy track", job_name, reference_chain_id)
     hydropathy = compute_hydropathy(axis, config.hyd_window)
 
     warnings: list[str] = []
     partial_reasons: list[str] = []
     model_tracks: list[ModelTracks] = []
-    for structure in parsed_structures:
+    for structure_index, structure in enumerate(parsed_structures, start=1):
+        logger.info(
+            "Job %s / Chain %s: processing model %s/%s (%s)",
+            job_name,
+            reference_chain_id,
+            structure_index,
+            len(parsed_structures),
+            structure.source_path.name,
+        )
         chain = get_chain_or_best_match(structure, reference_chain_id, reference_chain.sequence)
         if chain is None:
             warning = f"Skipping {structure.source_path.name}: no compatible protein chain found."
@@ -223,12 +294,15 @@ def _build_panel_data_for_reference_chain(
             partial_reasons.append(warning)
             continue
 
+        logger.info("Job %s / Chain %s: aligning %s to reference axis", job_name, reference_chain_id, structure.source_path.name)
         alignment = align_chain_to_axis(axis, chain)
         warnings.extend(alignment.warnings)
 
+        logger.info("Job %s / Chain %s: running DSSP for %s", job_name, reference_chain_id, structure.source_path.name)
         dssp_features, dssp_warnings = run_dssp(structure.source_path, logger)
         warnings.extend(dssp_warnings)
 
+        logger.info("Job %s / Chain %s: computing tracks for %s", job_name, reference_chain_id, structure.source_path.name)
         secondary_structure = build_secondary_structure_track(axis, alignment.residue_by_axis_index, dssp_features)
         accessibility = build_accessibility_track(axis, alignment.residue_by_axis_index, dssp_features)
         contacts = compute_contacts(
@@ -269,6 +343,8 @@ def _build_panel_data_for_reference_chain(
         workdir=workdir,
         logger=logger,
         warnings=warnings,
+        job_name=job_name,
+        reference_chain_id=reference_chain_id,
     )
     panel_status = "partial_success" if partial_reasons else "success"
     panel_data = JobPanelData(
@@ -285,62 +361,131 @@ def _build_panel_data_for_reference_chain(
     return panel_data, partial_reasons
 
 
-def _build_msa_data(*, axis, config: PipelineConfig, workdir: Path, logger: logging.Logger, warnings: list[str]) -> MSAData:
+def _build_msa_data(
+    *,
+    axis,
+    config: PipelineConfig,
+    workdir: Path,
+    logger: logging.Logger,
+    warnings: list[str],
+    job_name: str,
+    reference_chain_id: str,
+) -> MSAData:
     ensure_directory(workdir)
     query_sequence = "".join(position.one_letter for position in axis)
+    logger.info("Job %s / Chain %s: preparing MSA stage", job_name, reference_chain_id)
     if config.disable_msa:
+        logger.info("Job %s / Chain %s: MSA disabled by user", job_name, reference_chain_id)
         return MSAData(
             enabled=False,
             query=query_sequence,
             rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
             warnings=["MSA disabled by user."],
+            leading_display_overrides=[None],
+        )
+
+    if config.max_homologs_displayed == 0:
+        logger.info("Job %s / Chain %s: max_homologs_displayed=0, skipping homolog search", job_name, reference_chain_id)
+        return MSAData(
+            enabled=False,
+            query=query_sequence,
+            rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
+            leading_display_overrides=[None],
         )
 
     if config.msa_db is None:
+        logger.info("Job %s / Chain %s: no MSA database configured, skipping homolog search", job_name, reference_chain_id)
         return MSAData(
             enabled=False,
             query=query_sequence,
             rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
             warnings=["No MSA database provided; sequence alignment was skipped."],
+            leading_display_overrides=[None],
         )
 
     query_fasta = workdir / "query.fasta"
     query_fasta.write_text(f">query\n{query_sequence}\n", encoding="utf-8")
+    # max_homologs_displayed caps how many hits we keep, while evalue filters
+    # which candidate hits are significant enough to pass the search backend.
+    search_limit = config.max_homologs_displayed
+    logger.info(
+        "Job %s / Chain %s: searching homologs in %s (display limit=%s candidate limit=%s evalue=%s)",
+        job_name,
+        reference_chain_id,
+        config.msa_db,
+        config.max_homologs_displayed,
+        search_limit,
+        config.evalue,
+    )
     hits, hit_warnings = search_homologs(
         query_fasta,
         config.msa_db,
-        max_hits=config.max_hits,
+        max_homologs_displayed=search_limit,
+        evalue=config.evalue,
         workdir=workdir,
         logger=logger,
     )
     if hit_warnings:
         warnings.extend(hit_warnings)
     if not hits:
+        logger.info("Job %s / Chain %s: no homolog hits found", job_name, reference_chain_id)
         return MSAData(
             enabled=False,
             query=query_sequence,
             rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
             warnings=hit_warnings,
+            leading_display_overrides=[None],
         )
 
+    logger.info(
+        "Job %s / Chain %s: found %s homolog hit(s), running alignment",
+        job_name,
+        reference_chain_id,
+        len(hits),
+    )
     alignment_rows, align_warnings = align_sequences([("Query Sequence", query_sequence), *hits], workdir / "alignment.fasta", logger)
     if align_warnings:
         warnings.extend(align_warnings)
     if not alignment_rows:
+        logger.info("Job %s / Chain %s: alignment failed or returned no rows", job_name, reference_chain_id)
         return MSAData(
             enabled=False,
             query=query_sequence,
             rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
             warnings=hit_warnings + align_warnings,
+            leading_display_overrides=[None],
         )
 
     projected_rows = _project_alignment_to_query_axis(alignment_rows)
+    leading_display_overrides = _build_leading_display_overrides(alignment_rows, projected_rows)
+    displayed_rows, displayed_overrides, filtered_count = _select_display_msa_rows_with_overrides(
+        projected_rows,
+        leading_display_overrides,
+        max_homologs_displayed=config.max_homologs_displayed,
+    )
+    if len(displayed_rows) <= 1:
+        message = "No homolog rows remained after selection."
+        logger.info("Job %s / Chain %s: %s", job_name, reference_chain_id, message)
+        return MSAData(
+            enabled=False,
+            query=query_sequence,
+            rows=[displayed_rows[0]] if displayed_rows else [MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
+            warnings=hit_warnings + align_warnings + [message],
+            leading_display_overrides=[displayed_overrides[0]] if displayed_rows else [None],
+        )
+    logger.info(
+        "Job %s / Chain %s: MSA ready with %s homolog row(s)",
+        job_name,
+        reference_chain_id,
+        max(0, len(displayed_rows) - 1),
+    )
     return MSAData(
         enabled=True,
         query=query_sequence,
-        rows=projected_rows,
-        conservation=compute_conservation(projected_rows),
+        rows=displayed_rows,
+        conservation=compute_conservation(displayed_rows),
         warnings=hit_warnings + align_warnings,
+        leading_display_overrides=displayed_overrides,
     )
 
 
@@ -352,3 +497,72 @@ def _project_alignment_to_query_axis(rows: list[MSARow]) -> list[MSARow]:
         sequence = "".join(row.sequence[index] for index in keep_indices if index < len(row.sequence))
         projected.append(MSARow(identifier=row.identifier, sequence=sequence, is_query=row.is_query))
     return projected
+
+
+def _build_leading_display_overrides(aligned_rows: list[MSARow], projected_rows: list[MSARow]) -> list[str | None]:
+    if not aligned_rows or not projected_rows:
+        return []
+
+    query = next((row for row in aligned_rows if row.is_query), aligned_rows[0])
+    keep_indices = [index for index, residue in enumerate(query.sequence) if residue != "-"]
+    overrides: list[str | None] = []
+    for aligned_row, projected_row in zip(aligned_rows, projected_rows, strict=True):
+        if aligned_row.is_query:
+            overrides.append(None)
+            continue
+        overrides.append(_leading_gap_display_override(projected_row.sequence, aligned_row.sequence, keep_indices))
+    return overrides
+
+
+def _leading_gap_display_override(projected_sequence: str, aligned_sequence: str, keep_indices: list[int]) -> str | None:
+    if not projected_sequence or projected_sequence[0] != "-" or not keep_indices:
+        return None
+
+    first_visible_index = next((index for index, residue in enumerate(projected_sequence) if residue != "-"), None)
+    if first_visible_index is None or first_visible_index >= len(keep_indices):
+        return None
+
+    anchor_index = keep_indices[first_visible_index]
+    start_index = min(anchor_index - 1, len(aligned_sequence) - 1)
+    for index in range(start_index, -1, -1):
+        residue = aligned_sequence[index]
+        if residue != "-":
+            return residue
+    return None
+
+
+def _select_display_msa_rows(rows: list[MSARow], *, max_homologs_displayed: int) -> tuple[list[MSARow], int]:
+    displayed_rows, _, filtered_count = _select_display_msa_rows_with_overrides(
+        rows,
+        [None] * len(rows),
+        max_homologs_displayed=max_homologs_displayed,
+    )
+    return displayed_rows, filtered_count
+
+
+def _select_display_msa_rows_with_overrides(
+    rows: list[MSARow],
+    leading_display_overrides: list[str | None],
+    *,
+    max_homologs_displayed: int,
+) -> tuple[list[MSARow], list[str | None], int]:
+    if not rows:
+        return [], [], 0
+
+    query_index = next((index for index, row in enumerate(rows) if row.is_query), 0)
+    selected: list[MSARow] = [rows[query_index]]
+    selected_overrides: list[str | None] = [
+        leading_display_overrides[query_index] if query_index < len(leading_display_overrides) else None
+    ]
+    kept_homologs = 0
+    for row_index, row in enumerate(rows):
+        if row.is_query:
+            continue
+        if kept_homologs >= max_homologs_displayed:
+            continue
+        selected.append(row)
+        selected_overrides.append(
+            leading_display_overrides[row_index] if row_index < len(leading_display_overrides) else None
+        )
+        kept_homologs += 1
+    return selected, selected_overrides, 0

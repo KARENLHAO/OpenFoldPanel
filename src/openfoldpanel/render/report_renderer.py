@@ -7,7 +7,7 @@ import json
 from functools import lru_cache
 from importlib import resources
 
-from openfoldpanel.models import JobPanelData, JobReportData, RenderConfig
+from openfoldpanel.models import JobPanelData, JobReportData, PipelineConfig, RenderConfig
 from openfoldpanel.render.svg_renderer import render_panel_svg
 from openfoldpanel.utils.text import humanize_chain_label, safe_chain_slug
 
@@ -38,10 +38,10 @@ def render_reference_chain_report_svg(job_name: str, panel_data: JobPanelData, d
     return panel_svg
 
 
-def render_html_report(report_data: JobReportData) -> str:
+def render_html_report(report_data: JobReportData, config: PipelineConfig) -> str:
     """Assemble the static HTML report from packaged frontend resources."""
 
-    panel_views = [_build_panel_view(panel_data) for panel_data in report_data.chain_panels]
+    panel_views = [_build_panel_view(panel_data, config) for panel_data in report_data.chain_panels]
     default_view = next(
         (panel for panel in panel_views if panel["referenceChain"] == report_data.default_reference_chain),
         panel_views[0],
@@ -80,14 +80,14 @@ def render_html_report(report_data: JobReportData) -> str:
     return template
 
 
-def _build_panel_view(panel_data: JobPanelData) -> dict[str, object]:
+def _build_panel_view(panel_data: JobPanelData, config: PipelineConfig) -> dict[str, object]:
     panel_svg, layout = render_panel_svg(panel_data)
     chain_label = humanize_chain_label(panel_data.reference_chain)
     return {
         "referenceChain": panel_data.reference_chain,
         "chainLabel": chain_label,
         "panelWidth": round(layout.width, 2),
-        "summaryItems": _build_summary_items(panel_data),
+        "summaryItems": _build_summary_items(panel_data, config),
         "warnings": list(panel_data.warnings),
         "templateMarkup": _render_chain_template(
             reference_chain=panel_data.reference_chain,
@@ -109,12 +109,32 @@ def _render_chain_template(*, reference_chain: str, chain_label: str, panel_widt
     )
 
 
-def _build_summary_items(panel_data: JobPanelData) -> list[dict[str, str]]:
+def _build_summary_items(panel_data: JobPanelData, config: PipelineConfig) -> list[dict[str, str]]:
     return [
         {"label": "参考链", "value": humanize_chain_label(panel_data.reference_chain)},
         {"label": "残基范围", "value": _sequence_span_label(panel_data)},
         {"label": "模型数量", "value": str(len(panel_data.models))},
         {"label": "输出状态", "value": _status_label(panel_data.status)},
+        {
+            "label": "疏水性窗口",
+            "value": str(config.hyd_window),
+            "tooltip": "Kyte-Doolittle 疏水性计算的滑动窗口大小。对应参数：--hyd-window",
+        },
+        {
+            "label": "显著性阈值",
+            "value": config.evalue,
+            "tooltip": "命中显著性筛选阈值，值越小越严格。对应参数：--evalue",
+        },
+        {
+            "label": "弱接触阈值",
+            "value": f"{config.contact_cutoff:g} A",
+            "tooltip": "判定弱接触的距离阈值，单位为埃。对应参数：--contact-cutoff",
+        },
+        {
+            "label": "强接触阈值",
+            "value": f"{config.strong_contact_cutoff:g} A",
+            "tooltip": "判定强接触的距离阈值，单位为埃。对应参数：--strong-contact-cutoff",
+        },
     ]
 
 
@@ -189,6 +209,7 @@ def _build_theme_vars(config: RenderConfig) -> str:
             f"  --ofp-color-contact-strong: {colors['contact_strong']};",
             f"  --ofp-color-contact-weak: {colors['contact_weak']};",
             f"  --ofp-color-contact-multi-outline: {colors['contact_multi_outline']};",
+            f"  --ofp-color-disulfide: {colors['disulfide_symbol']};",
             f"  --ofp-color-atmosphere: {colors['accent_border']};",
         ]
     )

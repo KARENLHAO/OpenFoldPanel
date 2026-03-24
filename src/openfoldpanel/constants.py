@@ -19,10 +19,22 @@ DEFAULT_HEADING_FONT_FAMILY = '"Noto Serif CJK SC", "Source Han Serif SC", "Song
 DEFAULT_COLUMNS = 80
 DEFAULT_FONT_SIZE = 12
 DEFAULT_HYDROPATHY_WINDOW = 3
-DEFAULT_MAX_HITS = 10
-DEFAULT_MSA_DISPLAY_ROWS = 1
+DEFAULT_MAX_HOMOLOGS_DISPLAYED = 5
+DEFAULT_EVALUE = "1e-6"  # BLAST hit significance threshold
+MAX_HOMOLOGS_DISPLAYED_LIMIT = 25
 DEFAULT_CONTACT_CUTOFF = 3.7
 DEFAULT_STRONG_CONTACT_CUTOFF = 3.2
+
+ALLOWED_EVALUES = ["1e-4", "1e-5", "1e-6", "1e-7", "1e-8", "1e-9", "1e-10", "1e-11", "1e-12"]
+
+
+def validate_evalue(value: str, *, parameter_name: str = "evalue") -> str:
+    """Validate the fixed BLAST/MMseqs hit significance threshold enum."""
+
+    if value not in ALLOWED_EVALUES:
+        allowed = ", ".join(ALLOWED_EVALUES)
+        raise ValueError(f"{parameter_name} must be one of: {allowed}.")
+    return value
 
 DEFAULT_CELL_WIDTH_RATIO = 0.68
 DEFAULT_ROW_HEIGHT_RATIO = 1.6
@@ -88,6 +100,7 @@ COLORS = {
     "contact_strong": "#9a5b1c",
     "contact_weak": "#2f68a6",
     "contact_multi_outline": "#2d7068",
+    "disulfide_symbol": "#5FA79A",
     "plddt_very_high": "#174d86",
     "plddt_confident": "#5387aa",
     "plddt_low": "#c59133",

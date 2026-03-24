@@ -28,7 +28,8 @@
 .toolbar-copy {
   display: grid;
   gap: 10px;
-  min-width: min(100%, 520px);
+  flex: 1 1 760px;
+  min-width: min(100%, 760px);
 }
 
 .ofp-chain-stage,
@@ -79,6 +80,11 @@
   .ofp-main-stage,
   .main-stage {
     width: 100%;
+  }
+
+  .ofp-toolbar-copy,
+  .toolbar-copy {
+    min-width: 100%;
   }
 }
 

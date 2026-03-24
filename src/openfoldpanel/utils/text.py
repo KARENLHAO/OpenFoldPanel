@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 
 def humanize_identifier(value: str) -> str:
@@ -50,3 +51,34 @@ def safe_chain_slug(chain_id: str) -> str:
         return "blank"
     sanitized = re.sub(r"[^A-Za-z0-9]+", "-", chain_id).strip("-")
     return sanitized or "blank"
+
+
+def summarize_msa_database_path(value: str | Path | None) -> str:
+    """Convert an MSA database path into a compact human-facing label."""
+
+    if value is None:
+        return "未设置"
+
+    path = Path(value)
+    leaf = path.name or str(path).rstrip("/").split("/")[-1]
+    if not leaf:
+        return "未设置"
+
+    lowered_leaf = leaf.casefold()
+    lowered_stem = Path(leaf).stem.casefold()
+    aliases = {
+        "pdbaa": "PDBAA",
+        "swissprot": "SWISSPROT",
+        "pdbaa50": "PDBAA50",
+        "pdbaa70": "PDBAA70",
+        "pdbaa90": "PDBAA90",
+        "pdbaa95": "PDBAA95",
+    }
+
+    if lowered_leaf in aliases:
+        return aliases[lowered_leaf]
+    if lowered_stem in aliases:
+        return aliases[lowered_stem]
+    if lowered_leaf == "uniprot_sprot.fasta" or lowered_stem == "uniprot_sprot":
+        return "SWISSPROT"
+    return leaf

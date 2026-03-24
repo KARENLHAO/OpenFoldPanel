@@ -220,6 +220,10 @@
   fill: var(--ofp-color-contact-weak);
 }
 
+.ofp-legend-contact-text.is-disulfide {
+  fill: var(--ofp-color-disulfide);
+}
+
 .ofp-legend-contact-outline {
   fill: none;
   stroke: var(--ofp-color-contact-multi-outline);

@@ -73,3 +73,10 @@ vendor/dssp/
 
 # Local ad-hoc assets
 Times New Roman.ttf
+
+# db
+pdbaa/
+swissprot/
+swissprot_fasta/
+
+run.sh

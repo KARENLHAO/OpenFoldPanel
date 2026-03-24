@@ -37,8 +37,11 @@
 - accessibility 轨道
 - hydropathy 轨道
 - contacts 轨道
+- 二硫键判断与接触轨道位点标识
 - SVG block wrapping
 - PDF / PNG 导出接口
+
+接触轨道现在会额外标出链内二硫键位点：当两个 `CYS` 残基都含有 `SG` 原子且 `SG-SG <= 2.2 Å` 时，会在对应残基格子中显示浅绿色 `S` 标识。
 
 ## 安装
 
@@ -208,8 +211,9 @@ python -m openfoldpanel \
   --columns 80 \
   --font-size 12 \
   --hyd-window 3 \
-  --msa-db /path/to/local/db \
-  --max-hits 10 \
+  --msa-db ./blastdb/swissprot_fasta/uniprot_sprot.fasta \
+  --max-homologs-displayed 5 \
+  --evalue 1e-6 \
   --contact-cutoff 3.7 \
   --strong-contact-cutoff 3.2 \
   --verbose
@@ -217,19 +221,125 @@ python -m openfoldpanel \
 
 ## CLI 参数
 
-- `--input PATH`
-- `--outdir OUTDIR`
-- `--chain ALL|A`
-- `--columns 80`
-- `--font-size 12`
-- `--hyd-window 3`
-- `--msa-db /path/to/db`
-- `--max-hits 10`
-- `--disable-msa`
-- `--keep-temp`
-- `--contact-cutoff 3.7`
-- `--strong-contact-cutoff 3.2`
-- `--verbose`
+当前 CLI 一共支持以下 13 个参数：
+
+| 参数 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--input PATH` | 是 | 无 | 输入结构文件或压缩包。支持 `.pdb`、`.cif`、`.mmcif`，也支持 `.zip`、`.tar.gz` 等压缩格式。 |
+| `--outdir OUTDIR` | 是 | 无 | 输出目录。每个 job 会在该目录下生成自己的结果子目录。 |
+| `--chain ALL\|CHAIN_ID` | 否 | `ALL` | 参考链选择器。`ALL` 表示为所有蛋白链分别出图，也可以指定单条链，例如 `A` 或 `B`。 |
+| `--columns INT` | 否 | `80` | 每个渲染 block 中显示的残基列数。值越大，单块越宽。 |
+| `--font-size INT` | 否 | `12` | 图板和 HTML 报告使用的基础字号。 |
+| `--hyd-window INT` | 否 | `3` | 疏水性轨道的平滑窗口大小，传给 Kyte-Doolittle profile 计算。 |
+| `--msa-db PATH` | 否 | 无 | 本地 BLAST/MMseqs 数据库前缀，或蛋白 FASTA 文件路径。未提供时会跳过 MSA 搜索。 |
+| `--max-homologs-displayed INT` | 否 | `5` | 同源序列检索上限和渲染上限，取值范围 `0-25`。`0` 表示不检索 homolog，只保留 query 行。 |
+| `--evalue ENUM` | 否 | `1e-6` | BLAST/MMseqs hit significance threshold。固定枚举，只允许 `1e-4` 到 `1e-12` 这 9 个值之一。 |
+| `--disable-msa` | 否 | 关闭 | 显式关闭 MSA 搜索和比对。即使提供了 `--msa-db`，也不会执行同源检索。 |
+| `--keep-temp` | 否 | 关闭 | 保留运行过程中生成的临时工作目录，便于排查问题。默认会在任务结束后自动清理。 |
+| `--contact-cutoff FLOAT` | 否 | `3.7` | 弱接触判定阈值，单位为埃（A）。 |
+| `--strong-contact-cutoff FLOAT` | 否 | `3.2` | 强接触判定阈值，单位为埃（A）。通常应小于或等于 `--contact-cutoff`。 |
+| `--verbose` | 否 | 关闭 | 打开详细日志输出。 |
+
+### 参数逐项说明
+
+#### `--input PATH`
+
+- 必填参数。
+- 输入既可以是单个结构文件，也可以是包含多个结构文件的压缩包。
+- 支持格式见下文“输入规则”。
+
+#### `--outdir OUTDIR`
+
+- 必填参数。
+- 所有输出结果都会写入该目录。
+- 如果是批量 job，程序会在该目录下按 job 名称创建子目录。
+
+#### `--chain ALL|CHAIN_ID`
+
+- 可选参数，默认值为 `ALL`。
+- `ALL` 表示自动收集输入中的所有蛋白链，并为每条参考链分别生成 PDF；HTML 报告中可切换链。
+- 也可以显式指定单条链，例如 `--chain A`。
+
+#### `--columns INT`
+
+- 可选参数，默认值为 `80`。
+- 控制每个横向 block 放多少个残基。
+- 该值越大，单页横向更宽、换块更少；该值越小，换块更频繁。
+
+#### `--font-size INT`
+
+- 可选参数，默认值为 `12`。
+- 控制 SVG/PDF 和 HTML 中大多数文字与单元格的基础尺寸。
+
+#### `--hyd-window INT`
+
+- 可选参数，默认值为 `3`。
+- 用于疏水性轨道的窗口平均，窗口越大，曲线越平滑。
+
+#### `--msa-db PATH`
+
+- 可选参数。
+- 支持两种输入形式：
+  - 本地 BLAST / MMseqs 数据库前缀
+  - 蛋白 FASTA 文件，例如 `./blastdb/swissprot_fasta/uniprot_sprot.fasta`
+- 如果不提供该参数，会跳过 MSA 搜索，但 query 行仍会保留。
+- 如果传入的是 FASTA：
+  - 有 `blastp` 且有 `makeblastdb` 时，会先在临时目录里自动构建一个 BLAST 蛋白库
+  - 没有 `makeblastdb` 但有 `mmseqs` 时，会直接把 FASTA 交给 `mmseqs easy-search`
+  - homolog 标签会优先从 FASTA 标识头恢复，Swiss-Prot 这类库可直接显示 `sp|P01674|KV3AM_MOUSE`
+
+#### `--max-homologs-displayed INT`
+
+- 可选参数，默认值为 `5`，允许范围为 `0-25`。
+- 它是“最多检索多少条”和“最多显示多少条”的上限，不是强制查满。
+- 例如设置为 `10` 时，程序会尽量搜索并渲染最多 `10` 条 homolog；如果数据库里只找到 `3` 条，就只显示 `3` 条。
+- 设为 `0` 时会直接跳过 homolog 搜索，只保留 query 行。
+
+#### `--evalue ENUM`
+
+- 可选参数，默认值为 `1e-6`。
+- 固定枚举值如下：
+  - `1e-4`
+  - `1e-5`
+  - `1e-6`
+  - `1e-7`
+  - `1e-8`
+  - `1e-9`
+  - `1e-10`
+  - `1e-11`
+  - `1e-12`
+- 该参数控制候选命中是否能通过显著性筛选，值越小，筛选越严格。
+- 它不是返回条数控制参数；返回条数上限仍由 `--max-homologs-displayed` 控制。
+- 当前实现会把它同时传给 `blastp` 和 `mmseqs easy-search`。
+
+#### `--disable-msa`
+
+- 可选开关。
+- 只要开启，就完全跳过同源搜索、比对和 conservation 计算。
+- 适合离线预览、快速出图，或者本机没有 BLAST/MMseqs/Clustal Omega 时使用。
+
+#### `--keep-temp`
+
+- 可选开关。
+- 默认会删除运行中解压、检索、比对产生的临时目录。
+- 开启后会保留这些中间文件，方便调试输入、数据库和外部工具问题。
+
+#### `--contact-cutoff FLOAT`
+
+- 可选参数，默认值为 `3.7`。
+- 残基与其他分子之间最短原子距离小于该值时，记为接触。
+- 该阈值控制弱接触的上界。
+
+#### `--strong-contact-cutoff FLOAT`
+
+- 可选参数，默认值为 `3.2`。
+- 当最短原子距离小于该值时，记为强接触。
+- 一般建议保持 `--strong-contact-cutoff <= --contact-cutoff`，这样强/弱接触分层更符合直觉。
+
+#### `--verbose`
+
+- 可选开关。
+- 开启后会输出更详细的运行日志，包括 job 发现、链选择、DSSP、MSA、接触计算等阶段信息。
 
 ## 输入规则
 
@@ -293,6 +403,9 @@ python -m openfoldpanel \
 
 - 优先使用 DSSP ASA 换算相对可及性
 - 若 DSSP 不可用，使用局部原子拥挤度近似
+- 图例颜色：
+  - 深蓝：埋藏 / 隐藏
+  - 浅蓝：暴露
 - 分类：
   - `buried < 0.1`
   - `intermediate 0.1 - 0.4`
@@ -303,6 +416,9 @@ python -m openfoldpanel \
 
 - Kyte-Doolittle
 - 默认窗口 `3`
+- 图例颜色：
+  - 橙色：疏水
+  - 蓝色：亲水
 - 分类：
   - `hydrophilic < -1.5`
   - `intermediate -1.5 ~ 1.5`
@@ -334,10 +450,27 @@ python -m openfoldpanel \
 
 - 未指定 `--disable-msa`
 - 提供 `--msa-db`
+- `--max-homologs-displayed` 位于 `0-25`
 - 本地可用 `blastp` 或 `mmseqs`
+- 若 `--msa-db` 直接指向 FASTA 且走 `blastp` 路径，本地还需要 `makeblastdb`
 - 本地可用 `clustalo`
 
 否则自动跳过 MSA，但 query 行仍会显示。
+
+同源序列数量规则：
+
+- `--max-homologs-displayed` 同时控制检索上限和渲染上限
+- `--evalue` 控制候选命中是否通过显著性筛选
+- 默认值为 `5`
+- 最大值为 `25`
+- `0` 表示不渲染 homolog 行，只保留 query 行
+- `--msa-db` 可直接指向蛋白 FASTA；若走 `blastp` 路径，会先自动建临时 BLAST 库
+- 命中标签优先从数据库头或 FASTA 标识头里提取规范 token
+- 搜索和显示都会按 `--max-homologs-displayed` 的上限处理 homolog 条数
+- 若 homolog 投影后首位是 `-`，页面会尝试仅在展示层用该行首个可见残基之前最近的原残基补齐首位；`tracks.json` 仍保留原始对齐字符
+- UniProt/Swiss-Prot / TrEMBL 命中优先显示 `sp|...|...` / `tr|...|...`
+- PDB 命中优先显示 `pdb|...|...`
+- 其他数据库若无法恢复到上述规范结构，则回退为原始内部 ID
 
 保守性着色规则：
 

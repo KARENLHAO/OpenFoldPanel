@@ -269,6 +269,14 @@ def _render_msa_row(panel_data: JobPanelData, row: LayoutRow, block: LayoutBlock
         if axis_index >= len(msa_row.sequence):
             continue
         residue = msa_row.sequence[axis_index]
+        if (
+            not msa_row.is_query
+            and axis_index == 0
+            and row.msa_row_index < len(panel_data.msa.leading_display_overrides)
+            and panel_data.msa.leading_display_overrides[row.msa_row_index] is not None
+            and residue == "-"
+        ):
+            residue = panel_data.msa.leading_display_overrides[row.msa_row_index] or residue
         query_residue = query_row.sequence[axis_index] if axis_index < len(query_row.sequence) else residue
         x = grid_x + local_index * config.cell_width
         bg_color, text_color = _msa_style(residue, query_residue, row.kind, config.colors)
@@ -318,17 +326,30 @@ def _render_contacts_row(panel_data: JobPanelData, model_index: int | None, bloc
         return ""
     config = layout.render_config
     grid_x = config.margin + config.label_width
-    track = panel_data.models[model_index].contacts
+    model = panel_data.models[model_index]
+    track = model.contacts
+    disulfide_indices = _disulfide_residue_indices(model.disulfides)
     pieces: list[str] = []
     for local_index, axis_index in enumerate(range(block.start, block.end)):
         if axis_index >= len(track):
             continue
         entry = track[axis_index]
         x = grid_x + local_index * config.cell_width
-        if entry.symbol:
+        if axis_index in disulfide_indices:
+            pieces.append(_render_contact_cell_background(x, y, height, config))
             pieces.append(
-                f'<rect x="{x + 0.2:.2f}" y="{y + 0.7:.2f}" width="{config.cell_width - 0.4:.2f}" height="{height - 1.4:.2f}" fill="{config.colors["contact_bg"]}" stroke="none"/>'
+                _render_contact_symbol(
+                    entry,
+                    x,
+                    y,
+                    height,
+                    config,
+                    symbol_override="S",
+                    color_override=config.colors["disulfide_symbol"],
+                )
             )
+        elif entry.symbol:
+            pieces.append(_render_contact_cell_background(x, y, height, config))
             pieces.append(_render_contact_symbol(entry, x, y, height, config))
         elif entry.is_multi_contact:
             pieces.append(
@@ -337,8 +358,27 @@ def _render_contacts_row(panel_data: JobPanelData, model_index: int | None, bloc
     return "\n".join(pieces)
 
 
-def _render_contact_symbol(entry: ContactEntry, x: float, y: float, height: float, config) -> str:
-    color = config.colors["contact_strong"] if entry.strength_category == "strong" else config.colors["contact_weak"]
+def _render_contact_cell_background(x: float, y: float, height: float, config) -> str:
+    return (
+        f'<rect x="{x + 0.2:.2f}" y="{y + 0.7:.2f}" width="{config.cell_width - 0.4:.2f}" '
+        f'height="{height - 1.4:.2f}" fill="{config.colors["contact_bg"]}" stroke="none"/>'
+    )
+
+
+def _render_contact_symbol(
+    entry: ContactEntry,
+    x: float,
+    y: float,
+    height: float,
+    config,
+    *,
+    symbol_override: str | None = None,
+    color_override: str | None = None,
+) -> str:
+    symbol = symbol_override if symbol_override is not None else (entry.symbol or "")
+    color = color_override or (
+        config.colors["contact_strong"] if entry.strength_category == "strong" else config.colors["contact_weak"]
+    )
     outline = ""
     if entry.is_multi_contact:
         outline = (
@@ -347,9 +387,17 @@ def _render_contact_symbol(entry: ContactEntry, x: float, y: float, height: floa
         )
     text = (
         f'<text class="contact-text" x="{x + config.cell_width / 2.0:.2f}" '
-        f'y="{y + height / 2.0 + 0.35:.2f}" fill="{color}">{html.escape(entry.symbol or "")}</text>'
+        f'y="{y + height / 2.0 + 0.35:.2f}" fill="{color}">{html.escape(symbol)}</text>'
     )
     return f"{outline}\n{text}" if outline else text
+
+
+def _disulfide_residue_indices(disulfides) -> set[int]:
+    indices: set[int] = set()
+    for bond in disulfides:
+        indices.add(bond.residue_index_a)
+        indices.add(bond.residue_index_b)
+    return indices
 
 
 def _secondary_annotations(track: list[SecondaryStructureEntry]) -> list[StructureAnnotation]:

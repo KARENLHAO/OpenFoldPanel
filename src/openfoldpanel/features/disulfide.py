@@ -8,7 +8,7 @@ from openfoldpanel.models import DisulfideBond, ResidueRecord
 
 
 def infer_disulfides(residue_by_axis_index: dict[int, ResidueRecord]) -> list[DisulfideBond]:
-    """Infer disulfide bonds from SG-SG distances within 2.2 Angstrom."""
+    """Infer chain-local disulfide bonds from SG-SG distances within 2.2 Angstrom."""
 
     cysteines: list[tuple[int, ResidueRecord]] = [
         (index, residue)
@@ -22,6 +22,8 @@ def infer_disulfides(residue_by_axis_index: dict[int, ResidueRecord]) -> list[Di
             continue
         for right_idx, right_residue in cysteines:
             if right_idx <= left_idx:
+                continue
+            if left_residue.residue_id.chain_id != right_residue.residue_id.chain_id:
                 continue
             right_sg = next((atom for atom in right_residue.atoms if atom.atom_name == "SG"), None)
             if right_sg is None:

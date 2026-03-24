@@ -52,7 +52,7 @@ class PanelLayout:
     render_config: RenderConfig
 
 
-def build_render_config(columns: int, font_size: int, msa_display_rows: int = 1) -> RenderConfig:
+def build_render_config(columns: int, font_size: int, max_homologs_displayed: int = 5) -> RenderConfig:
     """Build the shared render configuration from CLI parameters."""
 
     cell_width = round(font_size * max(DEFAULT_CELL_WIDTH_RATIO, 1.08), 2)
@@ -60,7 +60,7 @@ def build_render_config(columns: int, font_size: int, msa_display_rows: int = 1)
     label_width = round(cell_width * DEFAULT_LABEL_COLUMNS, 2)
     return RenderConfig(
         columns=columns,
-        msa_display_rows=msa_display_rows,
+        max_homologs_displayed=max_homologs_displayed,
         font_size=font_size,
         cell_width=cell_width,
         row_height=row_height,
@@ -84,7 +84,8 @@ def build_rows(panel_data: JobPanelData) -> list[LayoutRow]:
     rows.append(LayoutRow(kind="msa_query", label="查询序列", msa_row_index=query_index))
 
     for homolog_index, row_index in enumerate(_displayed_homolog_indices(panel_data), start=1):
-        label = "代表同源序列" if homolog_index == 1 else f"同源序列 {homolog_index}"
+        homolog_row = panel_data.msa.rows[row_index]
+        label = homolog_row.identifier.strip() or f"同源序列 {homolog_index}"
         rows.append(LayoutRow(kind="msa_homolog", label=label, msa_row_index=row_index))
 
     rows.append(LayoutRow(kind="accessibility", label="可及性"))
@@ -174,7 +175,7 @@ def build_panel_layout(panel_data: JobPanelData) -> PanelLayout:
 
 
 def _displayed_homolog_indices(panel_data: JobPanelData) -> list[int]:
-    max_rows = max(0, panel_data.render_config.msa_display_rows)
+    max_rows = max(0, panel_data.render_config.max_homologs_displayed)
     if max_rows == 0:
         return []
     homolog_rows = [index for index, row in enumerate(panel_data.msa.rows) if not row.is_query]

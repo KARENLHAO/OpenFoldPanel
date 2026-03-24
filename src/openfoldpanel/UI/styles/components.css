@@ -28,6 +28,8 @@
 .chain-control {
   display: grid;
   gap: 8px;
+  align-self: center;
+  margin-top: 30px;
 }
 
 .ofp-chain-label,
@@ -128,7 +130,7 @@
 }
 
 .ofp-summary-grid--toolbar {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px 14px;
 }
 
@@ -158,6 +160,31 @@
   font-size: 0.84rem;
 }
 
+.ofp-summary-label-row,
+.summary-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ofp-summary-help,
+.summary-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(147, 186, 180, 0.7);
+  border-radius: 999px;
+  color: var(--ofp-color-accent);
+  background: rgba(222, 236, 233, 0.78);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
 .ofp-summary-value,
 .summary-value {
   color: var(--ofp-color-text);
@@ -176,6 +203,33 @@
 .ofp-global-notes li + li,
 .global-notes li + li {
   margin-top: 6px;
+}
+
+.ofp-summary-grid--toolbar .ofp-summary-label,
+.ofp-summary-grid--toolbar .summary-label {
+  font-size: 0.8rem;
+}
+
+.ofp-summary-grid--toolbar .ofp-summary-value,
+.ofp-summary-grid--toolbar .summary-value {
+  font-size: 0.92rem;
+}
+
+@media (max-width: 1180px) {
+  .ofp-summary-grid--toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .ofp-summary-grid--toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ofp-chain-control,
+  .chain-control {
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 720px) {

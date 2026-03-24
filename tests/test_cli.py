@@ -8,6 +8,8 @@ import pytest
 
 import openfoldpanel.pipeline as pipeline_module
 from openfoldpanel.cli import build_parser, main
+from openfoldpanel.constants import ALLOWED_EVALUES, DEFAULT_EVALUE
+from openfoldpanel.utils.text import summarize_msa_database_path
 from tests.conftest import write_test_pdb
 
 
@@ -34,6 +36,7 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert {panel["reference_chain"] for panel in payload["chain_panels"]} == {"A", "B"}
     assert payload["chain_panels"][0]["models"]
     assert any(model["display_name"] == "Single Model / 链 A" for model in payload["chain_panels"][0]["models"])
+    assert "disulfides" in payload["chain_panels"][0]["models"][0]
 
     html_text = (job_dir / "report.html").read_text()
     assert "链 A" in html_text
@@ -41,12 +44,24 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "查询序列" in html_text
     assert "可及性" in html_text
     assert "疏水性" in html_text
+    assert "深蓝表示埋藏/隐藏，浅蓝表示暴露" in html_text
+    assert "橙色表示疏水，蓝色表示亲水" in html_text
     assert "置信度" in html_text
     assert "OpenFoldPanel / ARCHIVE" in html_text
     assert "FoldScript 风格图板" not in html_text
     assert "参考链选择" in html_text
     assert "图例" in html_text
     assert "single_model_A" in html_text
+    assert "疏水性窗口" in html_text
+    assert "显著性阈值" in html_text
+    assert "弱接触阈值" in html_text
+    assert "强接触阈值" in html_text
+    assert "3.7 A" in html_text
+    assert "3.2 A" in html_text
+    assert "--hyd-window" in html_text
+    assert "--evalue" in html_text
+    assert "--contact-cutoff" in html_text
+    assert "--strong-contact-cutoff" in html_text
     assert 'data-chain-select' in html_text
     assert 'data-report-page' in html_text
     assert 'data-active-chain-panel' in html_text
@@ -71,6 +86,7 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert 'data-legend-kind="helix"' in html_text
     assert 'data-legend-kind="turn"' in html_text
     assert 'data-legend-kind="confidence-very-high"' in html_text
+    assert 'data-legend-kind="contact-disulfide"' in html_text
     assert 'data-legend-kind="contact-multi"' in html_text
     assert 'data-current-chain-label' not in html_text
     assert 'supporting-rail' not in html_text
@@ -103,10 +119,74 @@ def test_cli_rejects_deprecated_auto_and_supports_specific_reference_chain_selec
     assert (chain_b_outdir / "single_model" / "reference-chain-B.pdf").exists()
 
 
-def test_cli_parser_accepts_msa_display_rows():
+def test_cli_parser_accepts_max_homologs_displayed_in_valid_range():
     parser = build_parser()
-    args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--msa-display-rows", "3"])
-    assert args.msa_display_rows == 3
+    args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--max-homologs-displayed", "5"])
+    assert args.max_homologs_displayed == 5
+
+    args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--max-homologs-displayed", "0"])
+    assert args.max_homologs_displayed == 0
+
+    args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--max-homologs-displayed", "25"])
+    assert args.max_homologs_displayed == 25
+
+
+def test_cli_parser_uses_default_evalue_and_accepts_allowed_values():
+    parser = build_parser()
+
+    default_args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out"])
+    assert default_args.evalue == DEFAULT_EVALUE
+
+    for evalue in ("1e-4", "1e-12"):
+        args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--evalue", evalue])
+        assert args.evalue == evalue
+
+
+def test_cli_parser_accepts_fasta_msa_database_path():
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "--input",
+            "demo.pdb",
+            "--outdir",
+            "out",
+            "--msa-db",
+            "blastdb/swissprot_fasta/uniprot_sprot.fasta",
+        ]
+    )
+    assert str(args.msa_db) == "blastdb/swissprot_fasta/uniprot_sprot.fasta"
+
+
+def test_cli_parser_rejects_out_of_range_and_legacy_msa_flags():
+    parser = build_parser()
+
+    with pytest.raises(SystemExit) as too_high:
+        parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--max-homologs-displayed", "26"])
+    assert too_high.value.code == 2
+
+    with pytest.raises(SystemExit) as negative:
+        parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--max-homologs-displayed", "-1"])
+    assert negative.value.code == 2
+
+    with pytest.raises(SystemExit) as legacy_hits:
+        parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--max-hits", "3"])
+    assert legacy_hits.value.code == 2
+
+    with pytest.raises(SystemExit) as legacy_rows:
+        parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--msa-display-rows", "3"])
+    assert legacy_rows.value.code == 2
+
+
+def test_cli_parser_rejects_invalid_evalue_values(capsys):
+    parser = build_parser()
+
+    for evalue in ("1e-3", "0.000001", "1E-6"):
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--evalue", evalue])
+        assert exc_info.value.code == 2
+        error_output = capsys.readouterr().err
+        assert "--evalue must be one of:" in error_output
+        assert ", ".join(ALLOWED_EVALUES) in error_output
 
 
 def test_cli_archive_batch_outputs_job_directories(tmp_path):
@@ -159,3 +239,15 @@ def test_ui_resources_are_available_from_package():
     assert ui_root.joinpath("styles/tokens.css").is_file()
     assert ui_root.joinpath("styles/figure.css").is_file()
     assert ui_root.joinpath("scripts/report.js").is_file()
+
+
+def test_summarize_msa_database_path_maps_known_aliases_and_private_paths():
+    assert summarize_msa_database_path(None) == "未设置"
+    assert summarize_msa_database_path("pdbaa") == "PDBAA"
+    assert summarize_msa_database_path("SWISSPROT") == "SWISSPROT"
+    assert summarize_msa_database_path("PDBAA50") == "PDBAA50"
+    assert summarize_msa_database_path("pdbaa70") == "PDBAA70"
+    assert summarize_msa_database_path("pdbaa90") == "PDBAA90"
+    assert summarize_msa_database_path("pdbaa95") == "PDBAA95"
+    assert summarize_msa_database_path("./blastdb/swissprot_fasta/uniprot_sprot.fasta") == "SWISSPROT"
+    assert summarize_msa_database_path("./A") == "A"

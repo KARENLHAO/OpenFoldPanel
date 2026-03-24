@@ -9,6 +9,13 @@ from openfoldpanel.models import MSARow
 from openfoldpanel.utils.subprocess import ExternalToolError, MissingExecutableError, run_command, which
 
 
+def _is_query_identifier(identifier: str) -> bool:
+    """Recognize the synthetic query row after FASTA round-trips."""
+
+    normalized = identifier.strip().lower().replace(" ", "_")
+    return normalized in {"query", "query_sequence"}
+
+
 def write_fasta(rows: list[tuple[str, str]], path: Path) -> None:
     """Write a FASTA file from identifier/sequence rows."""
 
@@ -25,6 +32,7 @@ def align_sequences(rows: list[tuple[str, str]], output_path: Path, logger: logg
 
     input_fasta = output_path.parent / "msa_input.fasta"
     write_fasta(rows, input_fasta)
+    logger.info("MSA alignment: running clustalo on %s sequence(s)", len(rows))
     try:
         run_command(
             [
@@ -40,6 +48,7 @@ def align_sequences(rows: list[tuple[str, str]], output_path: Path, logger: logg
     except (MissingExecutableError, ExternalToolError) as exc:
         logger.warning("clustalo alignment failed: %s", exc)
         return [], ["clustalo alignment failed; MSA track was skipped."]
+    logger.info("MSA alignment: wrote alignment to %s", output_path)
     return read_fasta_alignment(output_path), []
 
 
@@ -52,11 +61,11 @@ def read_fasta_alignment(path: Path) -> list[MSARow]:
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith(">"):
             if identifier is not None:
-                rows.append(MSARow(identifier=identifier, sequence="".join(chunks), is_query=identifier == "query"))
+                rows.append(MSARow(identifier=identifier, sequence="".join(chunks), is_query=_is_query_identifier(identifier)))
             identifier = line[1:].strip()
             chunks = []
         else:
             chunks.append(line.strip())
     if identifier is not None:
-        rows.append(MSARow(identifier=identifier, sequence="".join(chunks), is_query=identifier == "query"))
+        rows.append(MSARow(identifier=identifier, sequence="".join(chunks), is_query=_is_query_identifier(identifier)))
     return rows

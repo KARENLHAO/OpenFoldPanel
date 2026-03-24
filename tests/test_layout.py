@@ -4,6 +4,7 @@ from openfoldpanel.features.hydropathy import compute_hydropathy
 from openfoldpanel.models import (
     AccessibilityEntry,
     ContactEntry,
+    DisulfideBond,
     JobPanelData,
     MSAData,
     MSARow,
@@ -134,8 +135,8 @@ def test_turn_segments_render_as_curves_without_text_overlap():
     assert ">TT<" not in svg
 
 
-def test_layout_limits_displayed_homolog_rows_without_extra_secondary_annotation_band():
-    config = build_render_config(columns=8, font_size=12, msa_display_rows=1)
+def test_layout_uses_real_homolog_identifiers_without_extra_secondary_annotation_band():
+    config = build_render_config(columns=8, font_size=12, max_homologs_displayed=1)
     axis = [
         SequenceAxisPosition(index, "A", index + 1, "", "ALA", "A", str(index + 1))
         for index in range(8)
@@ -171,8 +172,8 @@ def test_layout_limits_displayed_homolog_rows_without_extra_secondary_annotation
             query="ACDEFGHI",
             rows=[
                 MSARow(identifier="Query Sequence", sequence="ACDEFGHI", is_query=True),
-                MSARow(identifier="Hit 1", sequence="ACDEFGHI"),
-                MSARow(identifier="Hit 2", sequence="ACDEFGHI"),
+                MSARow(identifier="sp|P01664|KV3AC_MOUSE", sequence="ACDEFGHI"),
+                MSARow(identifier="pdb|5B8C|A", sequence="ACDEFGHI"),
             ],
         ),
         hydropathy=hydropathy,
@@ -182,11 +183,56 @@ def test_layout_limits_displayed_homolog_rows_without_extra_secondary_annotation
     layout = build_panel_layout(panel)
     homolog_rows = [row for row in layout.rows if row.kind == "msa_homolog"]
     assert len(homolog_rows) == 1
+    assert homolog_rows[0].label == "sp|P01664|KV3AC_MOUSE"
 
     svg, _ = render_panel_svg(panel)
+    assert ">sp|P01664|KV3AC_MOUSE<" in svg
+    assert "代表同源序列" not in svg
     assert ">β1<" in svg
     assert ">β2<" in svg
     assert ">β3<" in svg
+
+
+def test_layout_hides_homolog_rows_when_max_homologs_displayed_is_zero():
+    config = build_render_config(columns=8, font_size=12, max_homologs_displayed=0)
+    axis = [
+        SequenceAxisPosition(index, "A", index + 1, "", "ALA", "A", str(index + 1))
+        for index in range(8)
+    ]
+    hydropathy = compute_hydropathy(axis, window=3)
+    model = ModelTracks(
+        name="ranked_0_A",
+        source_path="model.pdb",
+        chain="A",
+        secondary_structure=[SecondaryStructureEntry(index, "C", "coil") for index in range(8)],
+        plddt=[90.0] * 8,
+        accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(8)],
+        contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(8)],
+        display_name="ranked_0_A",
+    )
+    panel = JobPanelData(
+        job_name="demo",
+        reference_chain="A",
+        sequence_axis=axis,
+        models=[model],
+        msa=MSAData(
+            enabled=True,
+            query="ACDEFGHI",
+            rows=[
+                MSARow(identifier="Query Sequence", sequence="ACDEFGHI", is_query=True),
+                MSARow(identifier="sp|P01664|KV3AC_MOUSE", sequence="ACDEFGHI"),
+            ],
+        ),
+        hydropathy=hydropathy,
+        render_config=config,
+    )
+
+    layout = build_panel_layout(panel)
+    homolog_rows = [row for row in layout.rows if row.kind == "msa_homolog"]
+    assert homolog_rows == []
+
+    svg, _ = render_panel_svg(panel)
+    assert ">sp|P01664|KV3AC_MOUSE<" not in svg
 
 
 def test_structure_annotations_render_only_once_for_top_secondary_track():
@@ -271,6 +317,49 @@ def test_confidence_track_renders_one_cell_per_residue():
     assert "#5387aa" in svg
     assert "#c59133" in svg
     assert "#b56a39" in svg
+
+
+def test_disulfide_positions_render_as_s_in_contact_track_and_keep_multi_outline():
+    config = build_render_config(columns=4, font_size=12)
+    axis = [
+        SequenceAxisPosition(index, "A", index + 1, "", "CYS" if index in {1, 3} else "ALA", "C", str(index + 1))
+        for index in range(4)
+    ]
+    hydropathy = compute_hydropathy(axis, window=3)
+    contacts = [
+        ContactEntry(0, "ion", None, "ZN", "1", 2.1, "+", "strong"),
+        ContactEntry(1, "protein_chain", "B", "TYR", "5", 3.4, "#", "weak", is_multi_contact=True),
+        ContactEntry(2, None, None, None, None, None, None, None),
+        ContactEntry(3, None, None, None, None, None, None, None),
+    ]
+    model = ModelTracks(
+        name="ranked_0_A",
+        source_path="model.pdb",
+        chain="A",
+        secondary_structure=[SecondaryStructureEntry(index, "C", "coil") for index in range(4)],
+        plddt=[90.0] * 4,
+        accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(4)],
+        contacts=contacts,
+        disulfides=[DisulfideBond(residue_index_a=1, residue_index_b=3, chain_a="A", chain_b="A")],
+        display_name="Disulfide Demo / 链 A",
+    )
+    panel = JobPanelData(
+        job_name="demo",
+        reference_chain="A",
+        sequence_axis=axis,
+        models=[model],
+        msa=MSAData(enabled=False, query="ACAC", rows=[MSARow(identifier="query_sequence", sequence="ACAC", is_query=True)]),
+        hydropathy=hydropathy,
+        render_config=config,
+    )
+
+    svg, _ = render_panel_svg(panel)
+
+    assert svg.count(">S<") == 2
+    assert ">+<" in svg
+    assert ">#<" not in svg
+    assert "#5FA79A" in svg
+    assert 'stroke="#2d7068"' in svg
 
 
 def test_ticks_prefer_round_tens_when_terminal_label_would_overlap():

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import dataclass, field, fields as dataclass_fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,11 +13,11 @@ class PipelineConfig:
     outdir: Path
     chain: str
     columns: int
-    msa_display_rows: int
+    max_homologs_displayed: int
+    evalue: str
     font_size: int
     hyd_window: int
     msa_db: Path | None
-    max_hits: int
     disable_msa: bool
     keep_temp: bool
     contact_cutoff: float
@@ -187,12 +187,18 @@ class MSAData:
     rows: list[MSARow] = field(default_factory=list)
     conservation: list[ConservationEntry] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    leading_display_overrides: list[str | None] = field(
+        default_factory=list,
+        repr=False,
+        compare=False,
+        metadata={"serialize": False},
+    )
 
 
 @dataclass(slots=True)
 class RenderConfig:
     columns: int
-    msa_display_rows: int
+    max_homologs_displayed: int
     font_size: int
     cell_width: float
     row_height: float
@@ -239,7 +245,11 @@ def dataclass_to_dict(value: Any) -> Any:
     """Convert nested dataclasses into plain serializable dictionaries."""
 
     if is_dataclass(value):
-        return {key: dataclass_to_dict(item) for key, item in asdict(value).items()}
+        return {
+            field_info.name: dataclass_to_dict(getattr(value, field_info.name))
+            for field_info in dataclass_fields(value)
+            if field_info.metadata.get("serialize", True)
+        }
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, list):
