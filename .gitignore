@@ -3,25 +3,29 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environments
-.venv/
-venv/
+# Virtual environments and local env files
+/.venv/
+/venv/
 .env
 .env.*
 
 # Test and tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+/.pytest_cache/
+/.mypy_cache/
+/.ruff_cache/
+/.hypothesis/
+/.pyre/
+/.tox/
+/.nox/
 .coverage
 .coverage.*
 coverage.xml
 htmlcov/
 
 # Packaging artifacts
-build/
-dist/
-site/
+/build/
+/dist/
+/site/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
@@ -29,8 +33,8 @@ pip-wheel-metadata/
 *.whl
 
 # IDE and OS files
-.vscode/
-.idea/
+/.vscode/
+/.idea/
 .DS_Store
 Thumbs.db
 *.swp
@@ -38,25 +42,19 @@ Thumbs.db
 *~
 
 # Local workspace tooling
-.codex/
-.local/
+/.codex/
+/.local/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Python and QA local state
-.hypothesis/
-.pyre/
-.tox/
-.nox/
-
 # Local output, verification, and sample data
-out/
-out_*/
-verify_*/
-tmp/
-temp/
-data/
+/out/
+/out_*/
+/verify_*/
+/tmp/
+/temp/
+/data/
 
 # Generated OpenFoldPanel report artifacts
 report.html
@@ -69,14 +67,15 @@ panel.svg
 panel.png
 
 # Vendored third-party source and build artifacts
-vendor/dssp/
+/vendor/dssp/
 
-# Local ad-hoc assets
-Times New Roman.ttf
+# Local assets and helper runner scripts
+/Times New Roman.ttf
+/run.sh
+/run.py
 
-# db
-pdbaa/
-swissprot/
-swissprot_fasta/
-
-run.sh
+# Local databases and derived BLAST builds
+/blastdb/pdbaa/
+/blastdb/swissprot/
+/blastdb/swissprot_fasta/
+/blastdb/build/
