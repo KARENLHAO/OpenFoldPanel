@@ -79,3 +79,6 @@ panel.png
 /blastdb/swissprot/
 /blastdb/swissprot_fasta/
 /blastdb/build/
+/blastdb/pdb_cluster_src/
+/blastdbbk/
+Build_pdbaa_clusters.py

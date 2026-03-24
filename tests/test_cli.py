@@ -56,12 +56,20 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "显著性阈值" in html_text
     assert "弱接触阈值" in html_text
     assert "强接触阈值" in html_text
+    assert "同源显示上限" in html_text
+    assert "数据库" in html_text
     assert "3.7 A" in html_text
     assert "3.2 A" in html_text
+    assert "按最短非氢原子距离判定：小于 3.2 A。" in html_text
+    assert "按最短非氢原子距离判定：3.2 A 到 3.7 A 之间（含边界）。" in html_text
+    assert "5" in html_text
+    assert "未设置" in html_text
     assert "--hyd-window" in html_text
     assert "--evalue" in html_text
     assert "--contact-cutoff" in html_text
     assert "--strong-contact-cutoff" in html_text
+    assert "--max-homologs-displayed" in html_text
+    assert "--msa-db" in html_text
     assert 'data-chain-select' in html_text
     assert 'data-report-page' in html_text
     assert 'data-active-chain-panel' in html_text
@@ -155,6 +163,54 @@ def test_cli_parser_accepts_fasta_msa_database_path():
         ]
     )
     assert str(args.msa_db) == "blastdb/swissprot_fasta/uniprot_sprot.fasta"
+
+
+def test_cli_report_renders_uppercase_msa_database_name_from_path_tail(tmp_path):
+    input_path = write_test_pdb(tmp_path / "single_model.pdb")
+    outdir = tmp_path / "out"
+
+    exit_code = main(
+        [
+            "--input",
+            str(input_path),
+            "--outdir",
+            str(outdir),
+            "--msa-db",
+            "./blastdb/swissprot/swissprot",
+        ]
+    )
+    assert exit_code == 0
+
+    html_text = (outdir / "single_model" / "report.html").read_text()
+    assert "同源显示上限" in html_text
+    assert "5" in html_text
+    assert "数据库" in html_text
+    assert "SWISSPROT" in html_text
+    assert html_text.index("强接触阈值") < html_text.index("同源显示上限")
+    assert html_text.index("同源显示上限") < html_text.index("数据库")
+
+
+def test_cli_report_renders_contact_legend_thresholds_from_config(tmp_path):
+    input_path = write_test_pdb(tmp_path / "single_model.pdb")
+    outdir = tmp_path / "out"
+
+    exit_code = main(
+        [
+            "--input",
+            str(input_path),
+            "--outdir",
+            str(outdir),
+            "--contact-cutoff",
+            "4.1",
+            "--strong-contact-cutoff",
+            "3.5",
+        ]
+    )
+    assert exit_code == 0
+
+    html_text = (outdir / "single_model" / "report.html").read_text()
+    assert "按最短非氢原子距离判定：小于 3.5 A。" in html_text
+    assert "按最短非氢原子距离判定：3.5 A 到 4.1 A 之间（含边界）。" in html_text
 
 
 def test_cli_parser_rejects_out_of_range_and_legacy_msa_flags():

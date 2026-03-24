@@ -9,7 +9,7 @@ from importlib import resources
 
 from openfoldpanel.models import JobPanelData, JobReportData, PipelineConfig, RenderConfig
 from openfoldpanel.render.svg_renderer import render_panel_svg
-from openfoldpanel.utils.text import humanize_chain_label, safe_chain_slug
+from openfoldpanel.utils.text import humanize_chain_label, safe_chain_slug, summarize_msa_database_path
 
 
 UI_PACKAGE = "openfoldpanel.UI"
@@ -53,6 +53,8 @@ def render_html_report(report_data: JobReportData, config: PipelineConfig) -> st
         "__OFP_DEFAULT_CHAIN_ID__": html.escape(report_data.default_reference_chain),
         "__OFP_DEFAULT_CHAIN_LABEL__": html.escape(default_view["chainLabel"]),
         "__OFP_DEFAULT_PANEL_WIDTH__": f'{default_view["panelWidth"]:.2f}',
+        "__OFP_LEGEND_CONTACT_STRONG_TEXT__": html.escape(_contact_strong_legend_text(config)),
+        "__OFP_LEGEND_CONTACT_WEAK_TEXT__": html.escape(_contact_weak_legend_text(config)),
         "__OFP_THEME_VARS__": _build_theme_vars(report_data.chain_panels[0].render_config),
         "__OFP_INLINE_STYLES__": _load_ui_styles(),
         "__OFP_INLINE_SCRIPT__": _load_ui_script(),
@@ -135,6 +137,16 @@ def _build_summary_items(panel_data: JobPanelData, config: PipelineConfig) -> li
             "value": f"{config.strong_contact_cutoff:g} A",
             "tooltip": "判定强接触的距离阈值，单位为埃。对应参数：--strong-contact-cutoff",
         },
+        {
+            "label": "同源显示上限",
+            "value": str(config.max_homologs_displayed),
+            "tooltip": "同源序列检索和展示的最大条数。对应参数：--max-homologs-displayed",
+        },
+        {
+            "label": "数据库",
+            "value": summarize_msa_database_path(config.msa_db).upper(),
+            "tooltip": "检索使用的数据库名称，取自参数路径末段。对应参数：--msa-db",
+        },
     ]
 
 
@@ -144,6 +156,17 @@ def _sequence_span_label(panel_data: JobPanelData) -> str:
     first = panel_data.sequence_axis[0].label
     last = panel_data.sequence_axis[-1].label
     return f"{first} - {last}"
+
+
+def _contact_strong_legend_text(config: PipelineConfig) -> str:
+    return f"按最短非氢原子距离判定：小于 {config.strong_contact_cutoff:g} A。"
+
+
+def _contact_weak_legend_text(config: PipelineConfig) -> str:
+    return (
+        f"按最短非氢原子距离判定："
+        f"{config.strong_contact_cutoff:g} A 到 {config.contact_cutoff:g} A 之间（含边界）。"
+    )
 
 
 def _status_label(status: str) -> str:

@@ -122,6 +122,7 @@ clustalo --version
 
 如果这些命令都能正常输出版本信息，说明本地增强依赖已经基本就绪。
 
+数据库下载、建库和 `--msa-db` 的配置方式见 [blastdb/README.md](./blastdb/README.md)。
 
 ## 快速开始
 

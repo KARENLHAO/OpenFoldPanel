@@ -15,6 +15,8 @@ Note:
   This script only downloads raw files or prebuilt BLAST archives.
   If you want to build your own BLAST database prefix from a local sequence file,
   use: bash blastdb/Build_blastdb.sh --input <source_file> --out-prefix <prefix>
+  PDB cluster raw files are downloaded into blastdb/pdb_cluster_src/.
+  The downstream handling method for PDB cluster data will be updated later.
 
 Targets:
   recommended      Download the recommended set: swissprot-fasta and pdbaa.

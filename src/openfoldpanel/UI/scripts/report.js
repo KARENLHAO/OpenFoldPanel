@@ -33,40 +33,63 @@
     }
   };
 
+  const buildSummaryItem = (item) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "ofp-summary-item summary-item";
+
+    const labelRow = document.createElement("div");
+    labelRow.className = "ofp-summary-label-row summary-label-row";
+
+    const label = document.createElement("span");
+    label.className = "ofp-summary-label summary-label";
+    label.textContent = item.label;
+
+    labelRow.append(label);
+
+    if (item.tooltip) {
+      const help = document.createElement("span");
+      help.className = "ofp-summary-help summary-help";
+      help.textContent = "?";
+      help.title = item.tooltip;
+      help.setAttribute("aria-label", item.tooltip);
+      labelRow.append(help);
+    }
+
+    const value = document.createElement("span");
+    value.className = "ofp-summary-value summary-value";
+    value.textContent = item.value;
+
+    wrapper.append(labelRow, value);
+    return wrapper;
+  };
+
   const renderSummary = (items) => {
     if (!summaryGrid) {
       return;
     }
     clearChildren(summaryGrid);
-    items.forEach((item) => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "ofp-summary-item summary-item";
+    if (!items.length) {
+      return;
+    }
 
-      const labelRow = document.createElement("div");
-      labelRow.className = "ofp-summary-label-row summary-label-row";
+    const alignedItems = items.slice(0, 8);
+    const trailingItems = items.slice(8);
 
-      const label = document.createElement("span");
-      label.className = "ofp-summary-label summary-label";
-      label.textContent = item.label;
-
-      labelRow.append(label);
-
-      if (item.tooltip) {
-        const help = document.createElement("span");
-        help.className = "ofp-summary-help summary-help";
-        help.textContent = "?";
-        help.title = item.tooltip;
-        help.setAttribute("aria-label", item.tooltip);
-        labelRow.append(help);
-      }
-
-      const value = document.createElement("span");
-      value.className = "ofp-summary-value summary-value";
-      value.textContent = item.value;
-
-      wrapper.append(labelRow, value);
-      summaryGrid.append(wrapper);
+    const matrix = document.createElement("div");
+    matrix.className = "ofp-summary-matrix summary-matrix";
+    alignedItems.forEach((item) => {
+      matrix.append(buildSummaryItem(item));
     });
+    summaryGrid.append(matrix);
+
+    if (trailingItems.length) {
+      const trailing = document.createElement("div");
+      trailing.className = "ofp-summary-trailing summary-trailing";
+      trailingItems.forEach((item) => {
+        trailing.append(buildSummaryItem(item));
+      });
+      summaryGrid.append(trailing);
+    }
   };
 
   const renderWarnings = (card, titleNode, listNode, title, warnings) => {
