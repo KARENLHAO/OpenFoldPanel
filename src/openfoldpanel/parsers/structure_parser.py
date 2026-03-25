@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from openfoldpanel.models import AtomRecord, ChainRecord, ParsedStructure, ResidueId, ResidueRecord
-from openfoldpanel.utils.residue_utils import is_protein_residue, residue_entity_type, three_to_one
+from openfoldpanel.utils.residue_utils import residue_entity_type, three_to_one
 
 try:
     import gemmi  # type: ignore
@@ -91,7 +91,6 @@ def _parse_with_gemmi(path: Path) -> ParsedStructure:
 
 def _parse_pdb_text(path: Path) -> ParsedStructure:
     chain_residues: dict[str, dict[tuple[int, str, str, bool], list[AtomRecord]]] = defaultdict(lambda: defaultdict(list))
-    residue_names: dict[tuple[str, int, str, bool], str] = {}
 
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.startswith(("ATOM", "HETATM")):
@@ -120,7 +119,6 @@ def _parse_pdb_text(path: Path) -> ParsedStructure:
         )
         residue_key = (seq_id, insertion_code, resname, is_hetatm)
         chain_residues[chain_id][residue_key].append(atom)
-        residue_names[(chain_id, seq_id, insertion_code, is_hetatm)] = resname
 
     chains: dict[str, ChainRecord] = {}
     for chain_id, residue_map in chain_residues.items():
@@ -151,7 +149,6 @@ def _parse_mmcif_text(path: Path) -> ParsedStructure:
     lines = path.read_text(encoding="utf-8").splitlines()
     atom_fields: list[str] = []
     atom_rows: list[list[str]] = []
-    in_loop = False
     collecting_atom_loop = False
 
     index = 0
@@ -161,7 +158,6 @@ def _parse_mmcif_text(path: Path) -> ParsedStructure:
             index += 1
             continue
         if line == "loop_":
-            in_loop = True
             collecting_atom_loop = False
             atom_fields = []
             atom_rows = []

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from openfoldpanel.models import JobPanelData, JobReportData, JobRunResult
-from openfoldpanel.utils.text import humanize_chain_label, humanize_identifier
+from openfoldpanel.utils.text import humanize_chain_label, humanize_identifier, humanize_job_status
 
 
 def write_summary(job_result: JobRunResult, panel_data: JobPanelData | JobReportData | None, path: Path) -> None:
@@ -13,7 +13,7 @@ def write_summary(job_result: JobRunResult, panel_data: JobPanelData | JobReport
 
     lines = [
         f"Job Name: {humanize_identifier(job_result.job_name)}",
-        f"Job Status: {job_result.status.replace('_', ' ').title()}",
+        f"Job Status: {humanize_job_status(job_result.status)}",
         f"Output Directory: {job_result.output_dir}",
     ]
     if panel_data is not None:

@@ -44,6 +44,17 @@ def humanize_model_name(structure_name: str, chain_id: str) -> str:
     return f"{humanize_identifier(structure_name)} / {humanize_chain_label(chain_id)}"
 
 
+def humanize_job_status(status: str) -> str:
+    """Return a consistent human-facing label for pipeline job statuses."""
+
+    labels = {
+        "success": "Success",
+        "partial_success": "Partial Success",
+        "failed": "Failed",
+    }
+    return labels.get(status, humanize_label(status))
+
+
 def safe_chain_slug(chain_id: str) -> str:
     """Convert a chain identifier into a filesystem-safe fragment."""
 

@@ -10,7 +10,7 @@ from importlib import resources
 from openfoldpanel.models import JobPanelData, JobReportData, PipelineConfig, RenderConfig
 from openfoldpanel.render.font_assets import embedded_times_new_roman_css
 from openfoldpanel.render.svg_renderer import render_panel_svg
-from openfoldpanel.utils.text import humanize_chain_label, safe_chain_slug, summarize_msa_database_path
+from openfoldpanel.utils.text import humanize_chain_label, humanize_job_status, safe_chain_slug, summarize_msa_database_path
 
 
 UI_PACKAGE = "openfoldpanel.UI"
@@ -32,7 +32,7 @@ def reference_chain_pdf_name(reference_chain: str) -> str:
     return f"reference-chain-{safe_chain_slug(reference_chain)}.pdf"
 
 
-def render_reference_chain_report_svg(job_name: str, panel_data: JobPanelData, default_reference_chain: str) -> str:
+def render_reference_chain_report_svg(panel_data: JobPanelData) -> str:
     """Render one FoldScript-style panel SVG for PDF export."""
 
     panel_svg, _ = render_panel_svg(panel_data)
@@ -117,7 +117,7 @@ def _build_summary_items(panel_data: JobPanelData, config: PipelineConfig) -> li
         {"label": "Reference Chain", "value": humanize_chain_label(panel_data.reference_chain)},
         {"label": "Residue Span", "value": _sequence_span_label(panel_data)},
         {"label": "Model Count", "value": str(len(panel_data.models))},
-        {"label": "Output Status", "value": _status_label(panel_data.status)},
+        {"label": "Output Status", "value": humanize_job_status(panel_data.status)},
         {
             "label": "Hydropathy Window",
             "value": str(config.hyd_window),
@@ -168,15 +168,6 @@ def _contact_weak_legend_text(config: PipelineConfig) -> str:
         f"Based on the shortest non-hydrogen atom distance: "
         f"between {config.strong_contact_cutoff:g} A and {config.contact_cutoff:g} A, inclusive."
     )
-
-
-def _status_label(status: str) -> str:
-    labels = {
-        "success": "Success",
-        "partial_success": "Partial Success",
-        "failed": "Failed",
-    }
-    return labels.get(status, status)
 
 
 def _strip_xml_declaration(svg_markup: str) -> str:

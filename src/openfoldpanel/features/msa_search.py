@@ -47,10 +47,17 @@ def search_homologs(
     validated_evalue = validate_evalue(evalue)
     preparation_warnings: list[str] = []
     prepared_blast_database: PreparedDatabase | None = None
+    fasta_sequence_index, uniprot_header_map = _load_fasta_lookup_support(database)
     if which("blastp"):
-        prepared_blast_database = _prepare_blast_database(database, workdir, logger)
+        prepared_blast_database = _prepare_blast_database(
+            database,
+            workdir,
+            logger,
+            fasta_sequence_index=fasta_sequence_index,
+            uniprot_header_map=uniprot_header_map,
+        )
         preparation_warnings.extend(prepared_blast_database.preparation_warnings or [])
-        if prepared_blast_database.search_path != database or not preparation_warnings:
+        if _can_use_blastp(database, prepared_blast_database):
             logger.info("MSA search: using blastp")
             logger.info("BLAST evalue threshold: %s", validated_evalue)
             rows, warnings = _search_with_blastp(
@@ -74,8 +81,8 @@ def search_homologs(
             evalue=validated_evalue,
             workdir=workdir,
             logger=logger,
-            fasta_sequence_index=_load_fasta_sequence_index(database) if _is_fasta_database(database) else None,
-            uniprot_header_map=_load_uniprot_header_map_from_fasta(database) if _is_fasta_database(database) else None,
+            fasta_sequence_index=fasta_sequence_index,
+            uniprot_header_map=uniprot_header_map,
         )
         return rows, [*preparation_warnings, *warnings]
 
@@ -88,11 +95,30 @@ def _is_fasta_database(database: Path) -> bool:
     return database.suffix.casefold() in _FASTA_SUFFIXES
 
 
-def _prepare_blast_database(database: Path, workdir: Path, logger: logging.Logger) -> PreparedDatabase:
+def _load_fasta_lookup_support(
+    database: Path,
+) -> tuple[FastaSequenceIndex | None, dict[str, str] | None]:
+    if not _is_fasta_database(database):
+        return None, None
+    return _load_fasta_sequence_index(database), _load_uniprot_header_map_from_fasta(database)
+
+
+def _can_use_blastp(database: Path, prepared_database: PreparedDatabase) -> bool:
+    if not _is_fasta_database(database):
+        return True
+    return prepared_database.search_path != database
+
+
+def _prepare_blast_database(
+    database: Path,
+    workdir: Path,
+    logger: logging.Logger,
+    *,
+    fasta_sequence_index: FastaSequenceIndex | None,
+    uniprot_header_map: dict[str, str] | None,
+) -> PreparedDatabase:
     if not _is_fasta_database(database):
         return PreparedDatabase(search_path=database, preparation_warnings=[])
-
-    fasta_sequence_index = _load_fasta_sequence_index(database)
 
     if which("makeblastdb") is None:
         warning = "makeblastdb was not found; FASTA MSA database input could not be prepared for blastp."
@@ -100,7 +126,7 @@ def _prepare_blast_database(database: Path, workdir: Path, logger: logging.Logge
         return PreparedDatabase(
             search_path=database,
             fasta_sequence_index=fasta_sequence_index,
-            uniprot_header_map=_load_uniprot_header_map_from_fasta(database),
+            uniprot_header_map=uniprot_header_map,
             preparation_warnings=[warning],
         )
 
@@ -129,13 +155,13 @@ def _prepare_blast_database(database: Path, workdir: Path, logger: logging.Logge
             return PreparedDatabase(
                 search_path=database,
                 fasta_sequence_index=fasta_sequence_index,
-                uniprot_header_map=_load_uniprot_header_map_from_fasta(database),
+                uniprot_header_map=uniprot_header_map,
                 preparation_warnings=[warning],
             )
     return PreparedDatabase(
         search_path=prefix,
         fasta_sequence_index=fasta_sequence_index,
-        uniprot_header_map=_load_uniprot_header_map_from_fasta(database),
+        uniprot_header_map=uniprot_header_map,
         preparation_warnings=[],
     )
 

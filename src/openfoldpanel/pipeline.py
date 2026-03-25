@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import logging
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
 
 from openfoldpanel.extractors.archive import extract_archive
@@ -21,7 +23,19 @@ from openfoldpanel.features.secondary_structure import build_secondary_structure
 from openfoldpanel.io.json_dump import write_tracks_json
 from openfoldpanel.io.writers import write_summary
 from openfoldpanel.logging_utils import attach_file_logger, detach_handler
-from openfoldpanel.models import JobPanelData, JobReportData, JobRunResult, MSAData, MSARow, ModelTracks, PipelineConfig
+from openfoldpanel.models import (
+    JobDefinition,
+    JobPanelData,
+    JobReportData,
+    JobRunResult,
+    MSAData,
+    MSARow,
+    ModelTracks,
+    ParsedStructure,
+    PipelineConfig,
+    RenderConfig,
+    SequenceAxisPosition,
+)
 from openfoldpanel.parsers.plddt_reader import residue_plddt
 from openfoldpanel.parsers.sequence_mapper import align_chain_to_axis, build_sequence_axis
 from openfoldpanel.parsers.structure_parser import (
@@ -35,6 +49,29 @@ from openfoldpanel.render.pdf_export import export_pdf
 from openfoldpanel.render.report_renderer import reference_chain_pdf_name, render_html_report, render_reference_chain_report_svg
 from openfoldpanel.utils.filesystem import ensure_directory, safe_rmtree
 from openfoldpanel.utils.text import humanize_model_name, safe_chain_slug
+
+QUERY_SEQUENCE_IDENTIFIER = "Query Sequence"
+
+
+@dataclass(slots=True)
+class JobIssues:
+    warnings: list[str] = field(default_factory=list)
+    partial_reasons: list[str] = field(default_factory=list)
+
+    def add_warning(self, message: str) -> None:
+        self.warnings.append(message)
+
+    def add_partial(self, message: str) -> None:
+        self.warnings.append(message)
+        self.partial_reasons.append(message)
+
+    def extend_warnings(self, messages: Iterable[str]) -> None:
+        self.warnings.extend(messages)
+
+    def extend_partials(self, messages: Iterable[str]) -> None:
+        collected = list(messages)
+        self.warnings.extend(collected)
+        self.partial_reasons.extend(collected)
 
 
 def run_pipeline(config: PipelineConfig, logger: logging.Logger) -> dict[str, int]:
@@ -53,26 +90,13 @@ def run_pipeline(config: PipelineConfig, logger: logging.Logger) -> dict[str, in
 
     temp_dir = Path(tempfile.mkdtemp(prefix="openfoldpanel_"))
     try:
-        if is_supported_archive(config.input_path):
-            extracted_root = temp_dir / "archive"
-            logger.info("Extracting archive input to %s", extracted_root)
-            extract_archive(config.input_path, extracted_root)
-            jobs = discover_jobs_from_extracted_root(extracted_root, logger)
-        else:
-            logger.info("Discovering job from structure input %s", config.input_path)
-            jobs = discover_jobs_from_structure(config.input_path)
-
+        jobs = _discover_jobs(config, temp_dir, logger)
         logger.info("Discovered %s job(s) to process", len(jobs))
-        results: list[JobRunResult] = []
-        for job_index, job in enumerate(jobs, start=1):
-            results.append(_run_job(job, config, logger, temp_dir, job_index=job_index, total_jobs=len(jobs)))
-
-        return {
-            "total_jobs": len(results),
-            "success": sum(result.status == "success" for result in results),
-            "partial_success": sum(result.status == "partial_success" for result in results),
-            "failed": sum(result.status == "failed" for result in results),
-        }
+        results = [
+            _run_job(job, config, logger, temp_dir, job_index=job_index, total_jobs=len(jobs))
+            for job_index, job in enumerate(jobs, start=1)
+        ]
+        return _summarize_job_results(results)
     finally:
         if not config.keep_temp:
             logger.info("Cleaning up temporary workspace %s", temp_dir)
@@ -81,12 +105,39 @@ def run_pipeline(config: PipelineConfig, logger: logging.Logger) -> dict[str, in
             logger.info("Keeping temporary workspace at %s", temp_dir)
 
 
-def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path, *, job_index: int, total_jobs: int) -> JobRunResult:
+def _discover_jobs(config: PipelineConfig, temp_dir: Path, logger: logging.Logger) -> list[JobDefinition]:
+    if is_supported_archive(config.input_path):
+        extracted_root = temp_dir / "archive"
+        logger.info("Extracting archive input to %s", extracted_root)
+        extract_archive(config.input_path, extracted_root)
+        return discover_jobs_from_extracted_root(extracted_root, logger)
+
+    logger.info("Discovering job from structure input %s", config.input_path)
+    return discover_jobs_from_structure(config.input_path)
+
+
+def _summarize_job_results(results: list[JobRunResult]) -> dict[str, int]:
+    return {
+        "total_jobs": len(results),
+        "success": sum(result.status == "success" for result in results),
+        "partial_success": sum(result.status == "partial_success" for result in results),
+        "failed": sum(result.status == "failed" for result in results),
+    }
+
+
+def _run_job(
+    job: JobDefinition,
+    config: PipelineConfig,
+    logger: logging.Logger,
+    temp_dir: Path,
+    *,
+    job_index: int,
+    total_jobs: int,
+) -> JobRunResult:
     output_dir = ensure_directory(config.outdir / job.name)
     log_path = output_dir / "logs.txt"
     file_handler = attach_file_logger(logger, log_path)
-    warnings: list[str] = list(job.ignored_files)
-    partial_reasons: list[str] = []
+    issues = JobIssues(warnings=list(job.ignored_files))
     try:
         logger.info(
             "[Job %s/%s] Starting %s (%s structure file(s))",
@@ -96,38 +147,32 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
             len(job.structure_files),
         )
         if not job.structure_files:
-            result = JobRunResult(job_name=job.name, status="failed", output_dir=str(output_dir), error="No structure files found.")
-            write_summary(result, None, output_dir / "summary.txt")
-            return result
-
-        parsed_structures = []
-        for structure_index, structure_path in enumerate(job.structure_files, start=1):
-            logger.info(
-                "[Job %s/%s] Parsing model %s/%s: %s",
-                job_index,
-                total_jobs,
-                structure_index,
-                len(job.structure_files),
-                structure_path.name,
+            return _write_job_result(
+                output_dir,
+                JobRunResult(job_name=job.name, status="failed", output_dir=str(output_dir), error="No structure files found."),
+                None,
             )
-            try:
-                parsed_structures.append(parse_structure(structure_path, logger))
-            except Exception as exc:
-                warning = f"Failed to parse {structure_path.name}: {exc}"
-                logger.warning(warning)
-                warnings.append(warning)
-                partial_reasons.append(warning)
+
+        parsed_structures = _parse_job_structures(
+            job,
+            logger,
+            issues,
+            job_index=job_index,
+            total_jobs=total_jobs,
+        )
 
         if not parsed_structures:
-            result = JobRunResult(
-                job_name=job.name,
-                status="failed",
-                output_dir=str(output_dir),
-                warnings=warnings,
-                error="All models failed to parse.",
+            return _write_job_result(
+                output_dir,
+                JobRunResult(
+                    job_name=job.name,
+                    status="failed",
+                    output_dir=str(output_dir),
+                    warnings=issues.warnings,
+                    error="All models failed to parse.",
+                ),
+                None,
             )
-            write_summary(result, None, output_dir / "summary.txt")
-            return result
 
         logger.info(
             "[Job %s/%s] Parsed %s/%s model(s) successfully",
@@ -147,122 +192,243 @@ def _run_job(job, config: PipelineConfig, logger: logging.Logger, temp_dir: Path
             ", ".join(requested_reference_chains),
         )
 
-        chain_panels: list[JobPanelData] = []
-        for chain_index, reference_chain_id in enumerate(requested_reference_chains, start=1):
-            logger.info(
-                "[Job %s/%s] Building chain %s (%s/%s)",
-                job_index,
-                total_jobs,
-                reference_chain_id,
-                chain_index,
-                len(requested_reference_chains),
-            )
-            panel_data, chain_partial_reasons = _build_panel_data_for_reference_chain(
-                parsed_structures=parsed_structures,
-                reference_chain_id=reference_chain_id,
-                config=config,
-                render_config=render_config,
-                workdir=temp_dir / job.name / safe_chain_slug(reference_chain_id),
-                logger=logger,
-                job_name=job.name,
-            )
-            if panel_data is None:
-                warning = f"Skipped {reference_chain_id}: no compatible models could be mapped to the reference axis."
-                logger.warning(warning)
-                warnings.append(warning)
-                partial_reasons.append(warning)
-                continue
-
-            chain_panels.append(panel_data)
-            prefixed_warnings = [f"Chain {reference_chain_id}: {note}" for note in panel_data.warnings]
-            warnings.extend(prefixed_warnings)
-            partial_reasons.extend(f"Chain {reference_chain_id}: {note}" for note in chain_partial_reasons)
+        chain_panels = _build_chain_panels(
+            parsed_structures=parsed_structures,
+            requested_reference_chains=requested_reference_chains,
+            config=config,
+            render_config=render_config,
+            temp_dir=temp_dir,
+            job_name=job.name,
+            logger=logger,
+            issues=issues,
+            job_index=job_index,
+            total_jobs=total_jobs,
+        )
 
         if not chain_panels:
-            result = JobRunResult(
-                job_name=job.name,
-                status="failed",
-                output_dir=str(output_dir),
-                warnings=warnings,
-                error="No compatible models could be mapped to any protein reference chain.",
+            return _write_job_result(
+                output_dir,
+                JobRunResult(
+                    job_name=job.name,
+                    status="failed",
+                    output_dir=str(output_dir),
+                    warnings=issues.warnings,
+                    error="No compatible models could be mapped to any protein reference chain.",
+                ),
+                None,
             )
-            write_summary(result, None, output_dir / "summary.txt")
-            return result
 
-        if default_reference_chain not in {panel.reference_chain for panel in chain_panels}:
-            default_reference_chain = chain_panels[0].reference_chain
+        default_reference_chain = _resolve_default_reference_chain(default_reference_chain, chain_panels)
 
         report_data = JobReportData(
             job_name=job.name,
             default_reference_chain=default_reference_chain,
             chain_panels=chain_panels,
-            warnings=warnings,
+            warnings=issues.warnings,
             status="success",
         )
 
-        artifacts = []
-        for panel_data in chain_panels:
-            pdf_path = output_dir / reference_chain_pdf_name(panel_data.reference_chain)
-            logger.info(
-                "[Job %s/%s] Rendering report SVG and exporting PDF for chain %s",
-                job_index,
-                total_jobs,
-                panel_data.reference_chain,
-            )
-            report_svg = render_reference_chain_report_svg(job.name, panel_data, default_reference_chain)
-            pdf_ok, pdf_warning = export_pdf(report_svg, pdf_path)
-            if pdf_ok:
-                artifacts.append(pdf_path.name)
-            elif pdf_warning:
-                warnings.append(pdf_warning)
-                partial_reasons.append(pdf_warning)
+        artifacts = _export_reference_chain_pdfs(
+            report_data,
+            output_dir,
+            logger,
+            issues,
+            job_index=job_index,
+            total_jobs=total_jobs,
+        )
 
-        job_status = "partial_success" if partial_reasons else "success"
+        job_status = _status_from_partial_reasons(issues.partial_reasons)
         report_data.status = job_status
 
-        html_path = output_dir / "report.html"
-        logger.info("[Job %s/%s] Writing HTML report to %s", job_index, total_jobs, html_path)
-        html_path.write_text(render_html_report(report_data, config), encoding="utf-8")
-        artifacts.append(html_path.name)
-
-        json_path = output_dir / "tracks.json"
-        logger.info("[Job %s/%s] Writing tracks JSON to %s", job_index, total_jobs, json_path)
-        write_tracks_json(report_data, json_path)
-        artifacts.append(json_path.name)
+        artifacts.extend(
+            _write_report_artifacts(
+                report_data,
+                config,
+                output_dir,
+                logger,
+                job_index=job_index,
+                total_jobs=total_jobs,
+            )
+        )
         artifacts.append("summary.txt")
 
         result = JobRunResult(
             job_name=job.name,
             status=job_status,
             output_dir=str(output_dir),
-            warnings=warnings,
+            warnings=issues.warnings,
             artifacts=artifacts,
         )
-        logger.info("[Job %s/%s] Writing summary to %s", job_index, total_jobs, output_dir / "summary.txt")
-        write_summary(result, report_data, output_dir / "summary.txt")
         logger.info("[Job %s/%s] Finished %s with status=%s", job_index, total_jobs, job.name, job_status)
-        return result
+        return _write_job_result(output_dir, result, report_data)
     except Exception as exc:
         logger.exception("Job %s failed", job.name)
-        result = JobRunResult(
-            job_name=job.name,
-            status="failed",
-            output_dir=str(output_dir),
-            warnings=warnings,
-            error=str(exc),
+        return _write_job_result(
+            output_dir,
+            JobRunResult(
+                job_name=job.name,
+                status="failed",
+                output_dir=str(output_dir),
+                warnings=issues.warnings,
+                error=str(exc),
+            ),
+            None,
         )
-        write_summary(result, None, output_dir / "summary.txt")
-        return result
     finally:
         detach_handler(logger, file_handler)
 
 
+def _write_job_result(
+    output_dir: Path,
+    result: JobRunResult,
+    panel_data: JobPanelData | JobReportData | None,
+) -> JobRunResult:
+    write_summary(result, panel_data, output_dir / "summary.txt")
+    return result
+
+
+def _parse_job_structures(
+    job: JobDefinition,
+    logger: logging.Logger,
+    issues: JobIssues,
+    *,
+    job_index: int,
+    total_jobs: int,
+) -> list[ParsedStructure]:
+    parsed_structures: list[ParsedStructure] = []
+    for structure_index, structure_path in enumerate(job.structure_files, start=1):
+        logger.info(
+            "[Job %s/%s] Parsing model %s/%s: %s",
+            job_index,
+            total_jobs,
+            structure_index,
+            len(job.structure_files),
+            structure_path.name,
+        )
+        try:
+            parsed_structures.append(parse_structure(structure_path, logger))
+        except Exception as exc:
+            message = f"Failed to parse {structure_path.name}: {exc}"
+            logger.warning(message)
+            issues.add_partial(message)
+    return parsed_structures
+
+
+def _build_chain_panels(
+    *,
+    parsed_structures: list[ParsedStructure],
+    requested_reference_chains: list[str],
+    config: PipelineConfig,
+    render_config: RenderConfig,
+    temp_dir: Path,
+    job_name: str,
+    logger: logging.Logger,
+    issues: JobIssues,
+    job_index: int,
+    total_jobs: int,
+) -> list[JobPanelData]:
+    chain_panels: list[JobPanelData] = []
+    for chain_index, reference_chain_id in enumerate(requested_reference_chains, start=1):
+        logger.info(
+            "[Job %s/%s] Building chain %s (%s/%s)",
+            job_index,
+            total_jobs,
+            reference_chain_id,
+            chain_index,
+            len(requested_reference_chains),
+        )
+        panel_data, chain_partial_reasons = _build_panel_data_for_reference_chain(
+            parsed_structures=parsed_structures,
+            reference_chain_id=reference_chain_id,
+            config=config,
+            render_config=render_config,
+            workdir=temp_dir / job_name / safe_chain_slug(reference_chain_id),
+            logger=logger,
+            job_name=job_name,
+        )
+        if panel_data is None:
+            message = f"Skipped {reference_chain_id}: no compatible models could be mapped to the reference axis."
+            logger.warning(message)
+            issues.add_partial(message)
+            continue
+
+        chain_panels.append(panel_data)
+        issues.extend_warnings(_prefix_messages(f"Chain {reference_chain_id}", panel_data.warnings))
+        issues.extend_partials(_prefix_messages(f"Chain {reference_chain_id}", chain_partial_reasons))
+    return chain_panels
+
+
+def _resolve_default_reference_chain(default_reference_chain: str, chain_panels: list[JobPanelData]) -> str:
+    if default_reference_chain in {panel.reference_chain for panel in chain_panels}:
+        return default_reference_chain
+    return chain_panels[0].reference_chain
+
+
+def _prefix_messages(prefix: str, messages: Iterable[str]) -> list[str]:
+    return [f"{prefix}: {message}" for message in messages]
+
+
+def _status_from_partial_reasons(partial_reasons: list[str]) -> str:
+    return "partial_success" if partial_reasons else "success"
+
+
+def _export_reference_chain_pdfs(
+    report_data: JobReportData,
+    output_dir: Path,
+    logger: logging.Logger,
+    issues: JobIssues,
+    *,
+    job_index: int,
+    total_jobs: int,
+) -> list[str]:
+    artifacts: list[str] = []
+    for panel_data in report_data.chain_panels:
+        pdf_path = output_dir / reference_chain_pdf_name(panel_data.reference_chain)
+        logger.info(
+            "[Job %s/%s] Rendering report SVG and exporting PDF for chain %s",
+            job_index,
+            total_jobs,
+            panel_data.reference_chain,
+        )
+        report_svg = render_reference_chain_report_svg(panel_data)
+        pdf_ok, pdf_warning = export_pdf(report_svg, pdf_path)
+        if pdf_ok:
+            artifacts.append(pdf_path.name)
+        elif pdf_warning:
+            issues.add_partial(pdf_warning)
+    return artifacts
+
+
+def _write_report_artifacts(
+    report_data: JobReportData,
+    config: PipelineConfig,
+    output_dir: Path,
+    logger: logging.Logger,
+    *,
+    job_index: int,
+    total_jobs: int,
+) -> list[str]:
+    artifacts: list[str] = []
+
+    html_path = output_dir / "report.html"
+    logger.info("[Job %s/%s] Writing HTML report to %s", job_index, total_jobs, html_path)
+    html_path.write_text(render_html_report(report_data, config), encoding="utf-8")
+    artifacts.append(html_path.name)
+
+    json_path = output_dir / "tracks.json"
+    logger.info("[Job %s/%s] Writing tracks JSON to %s", job_index, total_jobs, json_path)
+    write_tracks_json(report_data, json_path)
+    artifacts.append(json_path.name)
+
+    return artifacts
+
+
 def _build_panel_data_for_reference_chain(
     *,
-    parsed_structures: list,
+    parsed_structures: list[ParsedStructure],
     reference_chain_id: str,
     config: PipelineConfig,
-    render_config,
+    render_config: RenderConfig,
     workdir: Path,
     logger: logging.Logger,
     job_name: str,
@@ -346,13 +512,13 @@ def _build_panel_data_for_reference_chain(
         config=config,
         workdir=workdir,
         logger=logger,
-        warnings=warnings,
         job_name=job_name,
         reference_chain_id=reference_chain_id,
     )
+    warnings.extend(msa.warnings)
     panel_status = "partial_success" if partial_reasons else "success"
     panel_data = JobPanelData(
-        job_name=reference_structure.name,
+        job_name=job_name,
         reference_chain=reference_chain_id,
         sequence_axis=axis,
         models=model_tracks,
@@ -367,11 +533,10 @@ def _build_panel_data_for_reference_chain(
 
 def _build_msa_data(
     *,
-    axis,
+    axis: list[SequenceAxisPosition],
     config: PipelineConfig,
     workdir: Path,
     logger: logging.Logger,
-    warnings: list[str],
     job_name: str,
     reference_chain_id: str,
 ) -> MSAData:
@@ -380,32 +545,15 @@ def _build_msa_data(
     logger.info("Job %s / Chain %s: preparing MSA stage", job_name, reference_chain_id)
     if config.disable_msa:
         logger.info("Job %s / Chain %s: MSA disabled by user", job_name, reference_chain_id)
-        return MSAData(
-            enabled=False,
-            query=query_sequence,
-            rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
-            warnings=["MSA disabled by user."],
-            leading_display_overrides=[None],
-        )
+        return _build_query_only_msa(query_sequence, warnings=["MSA disabled by user."])
 
     if config.max_homologs_displayed == 0:
         logger.info("Job %s / Chain %s: max_homologs_displayed=0, skipping homolog search", job_name, reference_chain_id)
-        return MSAData(
-            enabled=False,
-            query=query_sequence,
-            rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
-            leading_display_overrides=[None],
-        )
+        return _build_query_only_msa(query_sequence)
 
     if config.msa_db is None:
         logger.info("Job %s / Chain %s: no MSA database configured, skipping homolog search", job_name, reference_chain_id)
-        return MSAData(
-            enabled=False,
-            query=query_sequence,
-            rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
-            warnings=["No MSA database provided; sequence alignment was skipped."],
-            leading_display_overrides=[None],
-        )
+        return _build_query_only_msa(query_sequence, warnings=["No MSA database provided; sequence alignment was skipped."])
 
     query_fasta = workdir / "query.fasta"
     query_fasta.write_text(f">query\n{query_sequence}\n", encoding="utf-8")
@@ -429,17 +577,9 @@ def _build_msa_data(
         workdir=workdir,
         logger=logger,
     )
-    if hit_warnings:
-        warnings.extend(hit_warnings)
     if not hits:
         logger.info("Job %s / Chain %s: no homolog hits found", job_name, reference_chain_id)
-        return MSAData(
-            enabled=False,
-            query=query_sequence,
-            rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
-            warnings=hit_warnings,
-            leading_display_overrides=[None],
-        )
+        return _build_query_only_msa(query_sequence, warnings=hit_warnings)
 
     logger.info(
         "Job %s / Chain %s: found %s homolog hit(s), running alignment",
@@ -447,18 +587,14 @@ def _build_msa_data(
         reference_chain_id,
         len(hits),
     )
-    alignment_rows, align_warnings = align_sequences([("Query Sequence", query_sequence), *hits], workdir / "alignment.fasta", logger)
-    if align_warnings:
-        warnings.extend(align_warnings)
+    alignment_rows, align_warnings = align_sequences(
+        [(QUERY_SEQUENCE_IDENTIFIER, query_sequence), *hits],
+        workdir / "alignment.fasta",
+        logger,
+    )
     if not alignment_rows:
         logger.info("Job %s / Chain %s: alignment failed or returned no rows", job_name, reference_chain_id)
-        return MSAData(
-            enabled=False,
-            query=query_sequence,
-            rows=[MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
-            warnings=hit_warnings + align_warnings,
-            leading_display_overrides=[None],
-        )
+        return _build_query_only_msa(query_sequence, warnings=[*hit_warnings, *align_warnings])
 
     projected_rows = _project_alignment_to_query_axis(alignment_rows)
     leading_display_overrides = _build_leading_display_overrides(alignment_rows, projected_rows)
@@ -467,15 +603,21 @@ def _build_msa_data(
         leading_display_overrides,
         max_homologs_displayed=config.max_homologs_displayed,
     )
+    if filtered_count:
+        logger.info(
+            "Job %s / Chain %s: trimmed %s homolog row(s) to satisfy display limit",
+            job_name,
+            reference_chain_id,
+            filtered_count,
+        )
     if len(displayed_rows) <= 1:
         message = "No homolog rows remained after selection."
         logger.info("Job %s / Chain %s: %s", job_name, reference_chain_id, message)
-        return MSAData(
-            enabled=False,
-            query=query_sequence,
-            rows=[displayed_rows[0]] if displayed_rows else [MSARow(identifier="Query Sequence", sequence=query_sequence, is_query=True)],
-            warnings=hit_warnings + align_warnings + [message],
-            leading_display_overrides=[displayed_overrides[0]] if displayed_rows else [None],
+        return _build_query_only_msa(
+            query_sequence,
+            warnings=[*hit_warnings, *align_warnings, message],
+            rows=displayed_rows[:1],
+            leading_display_overrides=displayed_overrides[:1],
         )
     logger.info(
         "Job %s / Chain %s: MSA ready with %s homolog row(s)",
@@ -490,6 +632,28 @@ def _build_msa_data(
         conservation=compute_conservation(displayed_rows),
         warnings=hit_warnings + align_warnings,
         leading_display_overrides=displayed_overrides,
+    )
+
+
+def _build_query_row(query_sequence: str) -> MSARow:
+    return MSARow(identifier=QUERY_SEQUENCE_IDENTIFIER, sequence=query_sequence, is_query=True)
+
+
+def _build_query_only_msa(
+    query_sequence: str,
+    *,
+    warnings: list[str] | None = None,
+    rows: list[MSARow] | None = None,
+    leading_display_overrides: list[str | None] | None = None,
+) -> MSAData:
+    resolved_rows = rows if rows else [_build_query_row(query_sequence)]
+    resolved_overrides = leading_display_overrides if leading_display_overrides else [None] * len(resolved_rows)
+    return MSAData(
+        enabled=False,
+        query=query_sequence,
+        rows=resolved_rows,
+        warnings=list(warnings or []),
+        leading_display_overrides=resolved_overrides,
     )
 
 
@@ -559,6 +723,7 @@ def _select_display_msa_rows_with_overrides(
         leading_display_overrides[query_index] if query_index < len(leading_display_overrides) else None
     ]
     kept_homologs = 0
+    total_homologs = sum(1 for row in rows if not row.is_query)
     for row_index, row in enumerate(rows):
         if row.is_query:
             continue
@@ -569,4 +734,5 @@ def _select_display_msa_rows_with_overrides(
             leading_display_overrides[row_index] if row_index < len(leading_display_overrides) else None
         )
         kept_homologs += 1
-    return selected, selected_overrides, 0
+    filtered_count = max(0, total_homologs - kept_homologs)
+    return selected, selected_overrides, filtered_count

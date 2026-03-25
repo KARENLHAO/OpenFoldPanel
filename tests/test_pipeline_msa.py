@@ -82,7 +82,7 @@ def test_select_display_rows_keeps_first_homologs_in_original_order():
     selected, filtered_count = _select_display_msa_rows(rows, max_homologs_displayed=2)
 
     assert [row.identifier for row in selected] == ["Query Sequence", "h1", "h2"]
-    assert filtered_count == 0
+    assert filtered_count == 2
 
 
 def test_svg_uses_display_only_leading_override_without_mutating_msa_data():
@@ -174,7 +174,6 @@ def test_build_msa_data_uses_display_limit_as_search_limit(monkeypatch, tmp_path
         config=config,
         workdir=tmp_path / "chain_a",
         logger=logging.getLogger("test"),
-        warnings=[],
         job_name="demo",
         reference_chain_id="A",
     )

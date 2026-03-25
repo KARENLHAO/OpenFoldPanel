@@ -34,6 +34,7 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert payload["default_reference_chain"] == "A"
     assert payload["status"] == "success"
     assert {panel["reference_chain"] for panel in payload["chain_panels"]} == {"A", "B"}
+    assert {panel["job_name"] for panel in payload["chain_panels"]} == {"single_model"}
     assert payload["chain_panels"][0]["models"]
     assert any(model["display_name"] == "Single Model / Chain A" for model in payload["chain_panels"][0]["models"])
     assert "disulfides" in payload["chain_panels"][0]["models"][0]

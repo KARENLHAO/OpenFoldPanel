@@ -1,10 +1,17 @@
 # OpenFoldPanel
 
-`OpenFoldPanel` compares multiple AI-generated protein structure models and organizes the key information scattered across structure files into a unified 2D flat-panel report. When you have several candidate models for the same target, looking only at the top-ranked structure is often not enough, especially around multimer interfaces, locally low-confidence regions, or disagreements between prediction systems.
 
-Centered on a reference chain, `OpenFoldPanel` lays out secondary structure, accessibility, hydropathy, molecular contacts, confidence when available, and optional MSA / conservation information side by side. The goal is to make it easier to spot stable regions, regions that need manual review, and differences across model sets. Outputs include a browser-friendly `report.html`, chain-level PDFs, `tracks.json`, `summary.txt`, and `logs.txt`.
+`OpenFoldPanel` turns a set of candidate protein structures into a consistent comparison surface centered on a reference chain. It brings secondary structure, accessibility, hydropathy, contacts, confidence when available, and optional MSA / conservation into a single 2D report so stable regions, disagreements, and interface-level details are easier to review side by side.
 
-The project is inspired by FoldScript's comparison and presentation ideas, but it is implemented as an open-source, local-first CLI that can plug into batch workflows rather than a web server.
+The project is inspired by FoldScript's presentation ideas, but it is designed for open, local, batch-oriented workflows. Instead of relying on a hosted web service, `OpenFoldPanel` generates shareable artifacts you can archive, inspect in a browser, and plug into larger pipelines.
+
+| Output | Why it is useful |
+| --- | --- |
+| `report.html` | Browser-friendly report for quick interactive review |
+| `reference-chain-<CHAIN>.pdf` | Chain-level export suitable for sharing and annotation |
+| `tracks.json` | Structured machine-readable output for downstream processing |
+| `summary.txt` | Short human-readable job summary |
+| `logs.txt` | Detailed run log for debugging and provenance |
 
 ## Core Capabilities
 
@@ -12,8 +19,12 @@ The project is inspired by FoldScript's comparison and presentation ideas, but i
 - Supports multi-model, multi-chain, and multi-job processing so results from different predictors can be compared in one view.
 - Generates `report.html`, `reference-chain-<CHAIN>.pdf`, `tracks.json`, `summary.txt`, and `logs.txt`.
 - Provides tracks for secondary structure, accessibility, hydropathy, contacts, optional MSA / conservation, and confidence when present.
-- Summarizes sequence-level, secondary-structure-level, and tertiary/quaternary interaction clues in one report: reference-chain and MSA rows for sequence context, DSSP or geometry-based secondary-structure tracks, and interaction summaries from accessibility, hydropathy, disulfides, confidence, and cross-chain / ligand / nucleic-acid / ion contacts.
+- Summarizes sequence-level, secondary-structure-level, and tertiary / quaternary interaction clues in one report.
 - Supports `PDB`, `CIF`, `mmCIF`, and common archive formats so it can be inserted into existing prediction and curation workflows.
+
+## OpenFoldPanel Example
+
+Open the full [OpenFoldPanel example](./image/openfoldscript.pdf).
 
 ## Installation and Dependencies
 
@@ -38,7 +49,7 @@ python -m pip install -e .
 
 ### 3. Optional enhancement dependencies
 
-The core `OpenFoldPanel` reporting flow only needs Python packages, but the tools below significantly improve feature completeness:
+The core reporting flow only needs the Python packages in `requirements.txt`, but the tools below significantly improve feature completeness:
 
 - `mkdssp` / `dssp`
   Used for more reliable secondary-structure and accessibility calculation. If unavailable, the program falls back to rough geometry-based estimates so reports can still be generated, but DSSP is more accurate.
@@ -217,7 +228,7 @@ A few commonly used parameters deserve extra attention:
 - `--chain`
   The default is `ALL`. The program collects protein chains from the first successfully parsed structure and renders each chain separately. If you only care about one chain, specify it explicitly, for example `--chain B`.
 - `--msa-db`
-  You can pass either a BLAST / MMseqs database prefix or a protein FASTA file directly. For database download, build steps, and examples, see [blastdb/README.md](/workspaces/re-foldscript/blastdb/README.md).
+  You can pass either a BLAST / MMseqs database prefix or a protein FASTA file directly. For database download, build steps, and examples, see [blastdb/README.md](./blastdb/README.md).
 - `--max-homologs-displayed`
   Controls how many homologs can be retrieved and how many rows are ultimately rendered. If set to `0`, homolog rows are skipped and only the query row is kept.
 - `--evalue`
