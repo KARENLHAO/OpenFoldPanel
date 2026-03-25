@@ -24,6 +24,8 @@ The project is inspired by FoldScript's presentation ideas, but it is designed f
 
 ## OpenFoldPanel Example
 
+![OpenFoldPanel example](./image/openfoldscript.png)
+
 Open the full [OpenFoldPanel example](./image/openfoldscript.pdf).
 
 ## Installation and Dependencies
