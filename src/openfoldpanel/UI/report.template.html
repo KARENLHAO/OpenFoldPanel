@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -48,7 +48,7 @@ __OFP_INLINE_STYLES__
         <g class="ofp-atmosphere__sequence">
           <text x="1050" y="120">GLY  ALA  ASN  SER  TYR  LEU  CYS  GLU</text>
           <text x="94" y="620">A T G C C A U G A A C C U G A C</text>
-          <text x="1066" y="948">β-strand  helix  contact  pLDDT  accessibility</text>
+          <text x="1066" y="948">beta-strand  helix  contact  pLDDT  accessibility</text>
         </g>
         <g class="ofp-atmosphere__guides">
           <line x1="86" y1="128" x2="510" y2="128" />
@@ -65,21 +65,21 @@ __OFP_INLINE_STYLES__
       data-default-chain="__OFP_DEFAULT_CHAIN_ID__"
       style="--active-panel-width: __OFP_DEFAULT_PANEL_WIDTH__px;"
     >
-      <section class="ofp-toolbar toolbar" aria-label="图板控制区">
+      <section class="ofp-toolbar toolbar" aria-label="Panel Controls">
         <div class="ofp-toolbar-copy toolbar-copy">
           <p class="ofp-eyebrow eyebrow">OpenFoldPanel / ARCHIVE</p>
-          <section class="ofp-toolbar-summary" aria-label="当前链摘要">
+          <section class="ofp-toolbar-summary" aria-label="Current Chain Summary">
             <div class="ofp-summary-grid ofp-summary-grid--toolbar summary-grid" data-summary-grid></div>
           </section>
         </div>
 
         <label class="ofp-chain-control chain-control">
-          <span class="ofp-chain-label chain-label">参考链选择</span>
-          <select class="ofp-chain-select chain-select" data-chain-select aria-label="参考链选择器"></select>
+          <span class="ofp-chain-label chain-label">Reference Chain</span>
+          <select class="ofp-chain-select chain-select" data-chain-select aria-label="Reference chain selector"></select>
         </label>
       </section>
 
-      <section class="ofp-chain-stage chain-stack" aria-label="参考链图板">
+      <section class="ofp-chain-stage chain-stack" aria-label="Reference Chain Panel">
         <article
           class="ofp-chain-report chain-report is-active"
           data-active-chain-panel
@@ -94,12 +94,12 @@ __OFP_INLINE_STYLES__
                 </div>
               </div>
 
-              <section class="ofp-legend-deck" data-legend-deck aria-label="图例">
+              <section class="ofp-legend-deck" data-legend-deck aria-label="Legend">
                 <section class="ofp-legend-card ofp-rail-card rail-card" data-legend-card="structure">
-                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">结构</h2>
+                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">Structure</h2>
                   <div class="ofp-rail-body rail-body">
                     <section class="ofp-legend-group legend-group">
-                      <h3 class="ofp-legend-group-title legend-group-title">二级结构</h3>
+                      <h3 class="ofp-legend-group-title legend-group-title">Secondary Structure</h3>
                       <div class="ofp-legend-items legend-items">
                         <div class="ofp-legend-item legend-item" data-legend-kind="helix">
                           <span class="ofp-legend-symbol">
@@ -108,8 +108,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>螺旋</strong>
-                            <small>α-螺旋类二级结构单元。</small>
+                            <strong>Helix</strong>
+                            <small>Alpha-helical secondary structure segment.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="strand">
@@ -119,8 +119,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>折叠片</strong>
-                            <small>β-折叠片，并体现链段延伸方向。</small>
+                            <strong>Strand</strong>
+                            <small>Beta-strand segment with chain direction indicated.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="turn">
@@ -130,8 +130,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>转角</strong>
-                            <small>连接不同二级结构单元的转角区域。</small>
+                            <strong>Turn</strong>
+                            <small>Turn region connecting distinct secondary structure elements.</small>
                           </span>
                         </div>
                       </div>
@@ -140,18 +140,18 @@ __OFP_INLINE_STYLES__
                 </section>
 
                 <section class="ofp-legend-card ofp-rail-card rail-card" data-legend-card="tracks">
-                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">轨道</h2>
+                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">Tracks</h2>
                   <div class="ofp-rail-body rail-body">
                     <section class="ofp-legend-group legend-group">
-                      <h3 class="ofp-legend-group-title legend-group-title">序列与理化轨道</h3>
+                      <h3 class="ofp-legend-group-title legend-group-title">Sequence and Physicochemical Tracks</h3>
                       <div class="ofp-legend-items legend-items">
                         <div class="ofp-legend-item legend-item" data-legend-kind="msa-query">
                           <span class="ofp-legend-symbol">
                             <span class="ofp-sequence-cell is-query">A</span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>查询序列</strong>
-                            <small>表示目标序列在当前位置的残基字母单元格。</small>
+                            <strong>Query Sequence</strong>
+                            <small>Residue letter cell for the target sequence at this position.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="msa-identity">
@@ -159,8 +159,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-sequence-cell is-identity">A</span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>完全匹配</strong>
-                            <small>表示该位点残基与查询序列残基完全相同。</small>
+                            <strong>Exact Match</strong>
+                            <small>Residue is identical to the query sequence at this position.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="msa-similar">
@@ -168,8 +168,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-sequence-cell is-similar">S</span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>相似替换</strong>
-                            <small>表示该位点发生了保守替换，残基性质相近但不完全相同。</small>
+                            <strong>Similar Substitution</strong>
+                            <small>Residue differs from the query but remains a conservative substitution.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-buried">
@@ -177,8 +177,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-accessibility-buried"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>可及性 / 埋藏</strong>
-                            <small>深蓝表示表面可及性很低，残基大多位于内部。</small>
+                            <strong>Accessibility / Buried</strong>
+                            <small>Dark blue indicates very low surface accessibility and mostly buried residues.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-intermediate">
@@ -186,8 +186,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-accessibility-intermediate"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>可及性 / 中间</strong>
-                            <small>灰蓝表示部分暴露，位于埋藏与暴露之间的过渡状态。</small>
+                            <strong>Accessibility / Intermediate</strong>
+                            <small>Grey-blue indicates partial exposure between buried and exposed states.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-accessible">
@@ -195,8 +195,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-accessibility-accessible"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>可及性 / 可及</strong>
-                            <small>浅蓝表示残基较容易接触溶剂，表面暴露程度较高。</small>
+                            <strong>Accessibility / Accessible</strong>
+                            <small>Light blue indicates residues that are more solvent-accessible.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-highly-exposed">
@@ -204,8 +204,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-accessibility-highly-exposed"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>可及性 / 高度暴露</strong>
-                            <small>金色表示残基显著暴露在表面，通常最容易接触外部环境。</small>
+                            <strong>Accessibility / Highly Exposed</strong>
+                            <small>Gold indicates residues with strong surface exposure.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy-hydrophobic">
@@ -213,8 +213,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-hydrophobic"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>疏水性 / 疏水</strong>
-                            <small>橙色表示局部更偏疏水，常见于内部或脂质环境偏好的区域。</small>
+                            <strong>Hydropathy / Hydrophobic</strong>
+                            <small>Orange indicates locally hydrophobic regions, often buried or lipid-facing.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy-intermediate">
@@ -222,8 +222,8 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-hydropathy-intermediate"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>疏水性 / 中间</strong>
-                            <small>灰色表示局部理化性质接近中间态，不明显偏向亲水或疏水。</small>
+                            <strong>Hydropathy / Neutral</strong>
+                            <small>Gray indicates locally intermediate physicochemical character.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy-hydrophilic">
@@ -231,15 +231,15 @@ __OFP_INLINE_STYLES__
                             <span class="ofp-track-cell is-hydrophilic"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>疏水性 / 亲水</strong>
-                            <small>蓝色表示局部更偏亲水，更容易与水相环境相互作用。</small>
+                            <strong>Hydropathy / Hydrophilic</strong>
+                            <small>Blue indicates locally hydrophilic regions with stronger aqueous compatibility.</small>
                           </span>
                         </div>
                       </div>
                     </section>
 
                     <section class="ofp-legend-group legend-group">
-                      <h3 class="ofp-legend-group-title legend-group-title">置信度轨道</h3>
+                      <h3 class="ofp-legend-group-title legend-group-title">Confidence Tracks</h3>
                       <div class="ofp-legend-items legend-items">
                         <div class="ofp-legend-item legend-item" data-legend-kind="confidence-very-high">
                           <span class="ofp-legend-symbol">
@@ -250,8 +250,8 @@ __OFP_INLINE_STYLES__
                             </span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>很高</strong>
-                            <small>pLDDT ≥ 90，说明该区域结构预测可信度很高。</small>
+                            <strong>Very High</strong>
+                            <small>pLDDT ≥ 90 indicates very high local confidence.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="confidence-confident">
@@ -263,8 +263,8 @@ __OFP_INLINE_STYLES__
                             </span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>可信</strong>
-                            <small>70 ≤ pLDDT &lt; 90，说明该区域预测整体较可靠。</small>
+                            <strong>Confident</strong>
+                            <small>70 ≤ pLDDT &lt; 90 indicates a generally reliable region.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="confidence-low">
@@ -276,8 +276,8 @@ __OFP_INLINE_STYLES__
                             </span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>偏低</strong>
-                            <small>50 ≤ pLDDT &lt; 70，说明该区域预测可信度有限，需要谨慎解释。</small>
+                            <strong>Low</strong>
+                            <small>50 ≤ pLDDT &lt; 70 indicates limited confidence and should be interpreted carefully.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="confidence-very-low">
@@ -289,8 +289,8 @@ __OFP_INLINE_STYLES__
                             </span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>很低</strong>
-                            <small>pLDDT &lt; 50，说明该区域结构不稳定或预测不可靠。</small>
+                            <strong>Very Low</strong>
+                            <small>pLDDT &lt; 50 indicates an unstable or weakly predicted region.</small>
                           </span>
                         </div>
                       </div>
@@ -299,10 +299,10 @@ __OFP_INLINE_STYLES__
                 </section>
 
                 <section class="ofp-legend-card ofp-rail-card rail-card" data-legend-card="contacts">
-                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">接触</h2>
+                  <h2 class="ofp-legend-card-title ofp-rail-card-title rail-card-title">Contacts</h2>
                   <div class="ofp-rail-body rail-body">
                     <section class="ofp-legend-group legend-group">
-                      <h3 class="ofp-legend-group-title legend-group-title">接触强度与符号</h3>
+                      <h3 class="ofp-legend-group-title legend-group-title">Contact Strength and Symbols</h3>
                       <div class="ofp-legend-items legend-items">
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-strong">
                           <span class="ofp-legend-symbol">
@@ -312,7 +312,7 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>强蛋白链接触</strong>
+                            <strong>Strong Protein Contact</strong>
                             <small>__OFP_LEGEND_CONTACT_STRONG_TEXT__</small>
                           </span>
                         </div>
@@ -324,7 +324,7 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>弱蛋白链接触</strong>
+                            <strong>Weak Protein Contact</strong>
                             <small>__OFP_LEGEND_CONTACT_WEAK_TEXT__</small>
                           </span>
                         </div>
@@ -336,8 +336,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>分子内二硫键</strong>
-                            <small>绿色 S 表示同一条蛋白链内部的 CYS-CYS 二硫键。</small>
+                            <strong>Intramolecular Disulfide</strong>
+                            <small>Green S marks a CYS-CYS disulfide bond within the same protein chain.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-disulfide-inter">
@@ -348,8 +348,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>分子间二硫键</strong>
-                            <small>青色 S 表示不同蛋白链之间的 CYS-CYS 二硫键。</small>
+                            <strong>Intermolecular Disulfide</strong>
+                            <small>Cyan S marks a CYS-CYS disulfide bond between different protein chains.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-same-position">
@@ -360,8 +360,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>同位点蛋白链接触</strong>
-                            <small>表示接触双方残基编号相同且残基类型一致。</small>
+                            <strong>Same-position Protein Contact</strong>
+                            <small>Contact partners share the same residue number and residue identity.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-ion">
@@ -372,8 +372,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>离子</strong>
-                            <small>表示与离子分子发生接触。</small>
+                            <strong>Ion</strong>
+                            <small>Indicates a contact with an ion partner.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-nucleic-acid">
@@ -384,8 +384,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>核酸</strong>
-                            <small>表示与核酸分子发生接触。</small>
+                            <strong>Nucleic Acid</strong>
+                            <small>Indicates a contact with a nucleic-acid partner.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-porphyrin">
@@ -396,8 +396,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>卟啉样配体</strong>
-                            <small>表示与卟啉或相近类型的大环配体发生接触。</small>
+                            <strong>Porphyrin-like Ligand</strong>
+                            <small>Indicates contact with a porphyrin or related macrocyclic ligand.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-sugar">
@@ -408,8 +408,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>糖基</strong>
-                            <small>表示与糖类配体发生接触。</small>
+                            <strong>Glycan</strong>
+                            <small>Indicates contact with a carbohydrate ligand.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-other-ligand">
@@ -420,8 +420,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>其他配体</strong>
-                            <small>表示与非蛋白、非核酸、非糖类的其他异质分子发生接触。</small>
+                            <strong>Other Ligand</strong>
+                            <small>Indicates contact with another non-protein, non-nucleic-acid, non-glycan partner.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-multi">
@@ -433,8 +433,8 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>多重接触</strong>
-                            <small>表示同一位点同时存在多种类型的接触关系。</small>
+                            <strong>Multiple Contacts</strong>
+                            <small>Indicates multiple contact types at the same residue position.</small>
                           </span>
                         </div>
                       </div>
@@ -444,7 +444,7 @@ __OFP_INLINE_STYLES__
               </section>
 
               <details class="ofp-global-notes global-notes" data-chain-warnings hidden>
-                <summary data-chain-warnings-title>当前链提示</summary>
+                <summary data-chain-warnings-title>Current Chain Notes</summary>
                 <div class="ofp-rail-body rail-body">
                   <ul data-chain-warning-list></ul>
                 </div>
@@ -455,7 +455,7 @@ __OFP_INLINE_STYLES__
       </section>
 
       <details class="ofp-global-notes global-notes" data-job-warnings hidden>
-        <summary data-job-warnings-title>任务级提示</summary>
+        <summary data-job-warnings-title>Job-level Notes</summary>
         <div class="ofp-rail-body rail-body">
           <ul data-job-warning-list></ul>
         </div>

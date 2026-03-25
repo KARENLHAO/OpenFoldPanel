@@ -35,42 +35,45 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert payload["status"] == "success"
     assert {panel["reference_chain"] for panel in payload["chain_panels"]} == {"A", "B"}
     assert payload["chain_panels"][0]["models"]
-    assert any(model["display_name"] == "Single Model / 链 A" for model in payload["chain_panels"][0]["models"])
+    assert any(model["display_name"] == "Single Model / Chain A" for model in payload["chain_panels"][0]["models"])
     assert "disulfides" in payload["chain_panels"][0]["models"][0]
 
     html_text = (job_dir / "report.html").read_text()
-    assert "链 A" in html_text
-    assert "链 B" in html_text
-    assert "查询序列" in html_text
-    assert "可及性" in html_text
-    assert "疏水性" in html_text
-    assert "深蓝表示表面可及性很低，残基大多位于内部。" in html_text
-    assert "灰蓝表示部分暴露，位于埋藏与暴露之间的过渡状态。" in html_text
-    assert "浅蓝表示残基较容易接触溶剂，表面暴露程度较高。" in html_text
-    assert "金色表示残基显著暴露在表面，通常最容易接触外部环境。" in html_text
-    assert "橙色表示局部更偏疏水，常见于内部或脂质环境偏好的区域。" in html_text
-    assert "灰色表示局部理化性质接近中间态，不明显偏向亲水或疏水。" in html_text
-    assert "蓝色表示局部更偏亲水，更容易与水相环境相互作用。" in html_text
-    assert "分子内二硫键" in html_text
-    assert "分子间二硫键" in html_text
-    assert "置信度" in html_text
+    assert 'lang="en"' in html_text
+    assert "@font-face" in html_text
+    assert "OpenFoldPanel Times New Roman" in html_text
+    assert "Chain A" in html_text
+    assert "Chain B" in html_text
+    assert "Query Sequence" in html_text
+    assert "Accessibility" in html_text
+    assert "Hydropathy" in html_text
+    assert "Dark blue indicates very low surface accessibility and mostly buried residues." in html_text
+    assert "Grey-blue indicates partial exposure between buried and exposed states." in html_text
+    assert "Light blue indicates residues that are more solvent-accessible." in html_text
+    assert "Gold indicates residues with strong surface exposure." in html_text
+    assert "Orange indicates locally hydrophobic regions, often buried or lipid-facing." in html_text
+    assert "Gray indicates locally intermediate physicochemical character." in html_text
+    assert "Blue indicates locally hydrophilic regions with stronger aqueous compatibility." in html_text
+    assert "Intramolecular Disulfide" in html_text
+    assert "Intermolecular Disulfide" in html_text
+    assert "Confidence" in html_text
     assert "OpenFoldPanel / ARCHIVE" in html_text
-    assert "FoldScript 风格图板" not in html_text
-    assert "参考链选择" in html_text
-    assert "图例" in html_text
+    assert "FoldScript-style panel" not in html_text
+    assert "Reference Chain" in html_text
+    assert "Legend" in html_text
     assert "single_model_A" in html_text
-    assert "疏水性窗口" in html_text
-    assert "显著性阈值" in html_text
-    assert "弱接触阈值" in html_text
-    assert "强接触阈值" in html_text
-    assert "同源显示上限" in html_text
-    assert "数据库" in html_text
+    assert "Hydropathy Window" in html_text
+    assert "E-value Threshold" in html_text
+    assert "Weak Contact Cutoff" in html_text
+    assert "Strong Contact Cutoff" in html_text
+    assert "Homolog Display Limit" in html_text
+    assert "Database" in html_text
     assert "3.7 A" in html_text
     assert "3.2 A" in html_text
-    assert "按最短非氢原子距离判定：小于 3.2 A。" in html_text
-    assert "按最短非氢原子距离判定：3.2 A 到 3.7 A 之间（含边界）。" in html_text
+    assert "Based on the shortest non-hydrogen atom distance: below 3.2 A." in html_text
+    assert "Based on the shortest non-hydrogen atom distance: between 3.2 A and 3.7 A, inclusive." in html_text
     assert "5" in html_text
-    assert "未设置" in html_text
+    assert "Not set" in html_text
     assert "--hyd-window" in html_text
     assert "--evalue" in html_text
     assert "--contact-cutoff" in html_text
@@ -117,12 +120,12 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert html_text.index('data-figure-sheet') < html_text.index('data-legend-deck')
     assert html_text.index('data-legend-deck') < html_text.index('data-chain-warnings')
     assert "fetch(" not in html_text
-    assert "导出当前链 PDF" not in html_text
-    assert "下载 Tracks JSON" not in html_text
-    assert "查看摘要" not in html_text
-    assert "查看日志" not in html_text
-    assert "术语说明" not in html_text
-    assert "研究协作报告" not in html_text
+    assert "Export Current Chain PDF" not in html_text
+    assert "Download Tracks JSON" not in html_text
+    assert "View Summary" not in html_text
+    assert "View Logs" not in html_text
+    assert "Terminology" not in html_text
+    assert "Research Collaboration Report" not in html_text
 
 
 def test_cli_rejects_deprecated_auto_and_supports_specific_reference_chain_selection(tmp_path):
@@ -197,12 +200,12 @@ def test_cli_report_renders_uppercase_msa_database_name_from_path_tail(tmp_path)
     assert exit_code == 0
 
     html_text = (outdir / "single_model" / "report.html").read_text()
-    assert "同源显示上限" in html_text
+    assert "Homolog Display Limit" in html_text
     assert "5" in html_text
-    assert "数据库" in html_text
+    assert "Database" in html_text
     assert "SWISSPROT" in html_text
-    assert html_text.index("强接触阈值") < html_text.index("同源显示上限")
-    assert html_text.index("同源显示上限") < html_text.index("数据库")
+    assert html_text.index("Strong Contact Cutoff") < html_text.index("Homolog Display Limit")
+    assert html_text.index("Homolog Display Limit") < html_text.index("Database")
 
 
 def test_cli_report_renders_contact_legend_thresholds_from_config(tmp_path):
@@ -224,8 +227,8 @@ def test_cli_report_renders_contact_legend_thresholds_from_config(tmp_path):
     assert exit_code == 0
 
     html_text = (outdir / "single_model" / "report.html").read_text()
-    assert "按最短非氢原子距离判定：小于 3.5 A。" in html_text
-    assert "按最短非氢原子距离判定：3.5 A 到 4.1 A 之间（含边界）。" in html_text
+    assert "Based on the shortest non-hydrogen atom distance: below 3.5 A." in html_text
+    assert "Based on the shortest non-hydrogen atom distance: between 3.5 A and 4.1 A, inclusive." in html_text
 
 
 def test_cli_parser_rejects_out_of_range_and_legacy_msa_flags():
@@ -307,13 +310,14 @@ def test_ui_resources_are_available_from_package():
     ui_root = resources.files("openfoldpanel.UI")
 
     assert ui_root.joinpath("report.template.html").is_file()
+    assert ui_root.joinpath("fonts/Times New Roman.ttf").is_file()
     assert ui_root.joinpath("styles/tokens.css").is_file()
     assert ui_root.joinpath("styles/figure.css").is_file()
     assert ui_root.joinpath("scripts/report.js").is_file()
 
 
 def test_summarize_msa_database_path_maps_known_aliases_and_private_paths():
-    assert summarize_msa_database_path(None) == "未设置"
+    assert summarize_msa_database_path(None) == "Not set"
     assert summarize_msa_database_path("pdbaa") == "PDBAA"
     assert summarize_msa_database_path("SWISSPROT") == "SWISSPROT"
     assert summarize_msa_database_path("PDBAA50") == "PDBAA50"

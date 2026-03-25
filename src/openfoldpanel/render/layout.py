@@ -78,18 +78,18 @@ def build_rows(panel_data: JobPanelData) -> list[LayoutRow]:
     rows: list[LayoutRow] = []
     for index, model in enumerate(panel_data.models):
         rows.append(LayoutRow(kind="secondary", label=model.name, model_index=index))
-        rows.append(LayoutRow(kind="confidence", label="置信度", model_index=index))
+        rows.append(LayoutRow(kind="confidence", label="Confidence", model_index=index))
 
     query_index = next((index for index, row in enumerate(panel_data.msa.rows) if row.is_query), 0)
-    rows.append(LayoutRow(kind="msa_query", label="查询序列", msa_row_index=query_index))
+    rows.append(LayoutRow(kind="msa_query", label="Query Sequence", msa_row_index=query_index))
 
     for homolog_index, row_index in enumerate(_displayed_homolog_indices(panel_data), start=1):
         homolog_row = panel_data.msa.rows[row_index]
-        label = homolog_row.identifier.strip() or f"同源序列 {homolog_index}"
+        label = homolog_row.identifier.strip() or f"Homolog {homolog_index}"
         rows.append(LayoutRow(kind="msa_homolog", label=label, msa_row_index=row_index))
 
-    rows.append(LayoutRow(kind="accessibility", label="可及性"))
-    rows.append(LayoutRow(kind="hydropathy", label="疏水性"))
+    rows.append(LayoutRow(kind="accessibility", label="Accessibility"))
+    rows.append(LayoutRow(kind="hydropathy", label="Hydropathy"))
 
     for index, model in enumerate(panel_data.models):
         rows.append(LayoutRow(kind="contacts", label=model.name, model_index=index))

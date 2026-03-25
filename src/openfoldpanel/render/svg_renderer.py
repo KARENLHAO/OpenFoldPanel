@@ -10,6 +10,7 @@ from pathlib import Path
 
 from openfoldpanel.constants import PLDDT_THRESHOLDS
 from openfoldpanel.models import ContactEntry, JobPanelData, SecondaryStructureEntry
+from openfoldpanel.render.font_assets import embedded_times_new_roman_css
 from openfoldpanel.render.glyphs import helix_path, strand_points, turn_path
 from openfoldpanel.render.layout import LayoutBlock, LayoutRow, PanelLayout, build_panel_layout
 from openfoldpanel.utils.residue_utils import compatible_similarity_group
@@ -62,16 +63,17 @@ def _render_svg_string(panel_data: JobPanelData, layout: PanelLayout) -> str:
 
 
 def _style_block(config) -> str:
-    sequence_font = '"Liberation Mono", "Nimbus Mono PS", "Courier New", monospace'
+    shared_font = config.font_family
     return (
         "<style>"
-        f'.model-label{{font-family:{sequence_font};font-size:{config.font_size + 0.5}px;fill:{config.colors["strand_fill"]};font-style:italic;font-weight:700;}}'
+        f"{embedded_times_new_roman_css()}"
+        f'.model-label{{font-family:{shared_font};font-size:{config.font_size + 0.5}px;fill:{config.colors["strand_fill"]};font-style:italic;font-weight:700;}}'
         f'.track-label{{font-family:{config.font_family};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-style:italic;font-weight:700;}}'
         f'.homolog-label{{font-family:{config.font_family};font-size:{config.font_size - 0.3}px;fill:{config.colors["text"]};font-weight:600;}}'
         f'.annotation-label{{font-family:{config.heading_font_family};font-size:{config.font_size + 1.2}px;font-weight:700;}}'
-        f'.tick-label{{font-family:{sequence_font};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-weight:700;}}'
-        f'.sequence-text{{font-family:{sequence_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
-        f'.contact-text{{font-family:{sequence_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
+        f'.tick-label{{font-family:{shared_font};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-weight:700;}}'
+        f'.sequence-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
+        f'.contact-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
         '.confidence-cell{shape-rendering:crispEdges;}'
         f'.turn-track{{fill:none;stroke:{config.colors["turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
         f'.soft-rule{{stroke:{config.colors["grid"]};stroke-width:0.9;}}'

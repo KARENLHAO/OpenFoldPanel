@@ -31,7 +31,7 @@ def _build_tick_panel(seq_ids: list[int]) -> JobPanelData:
         plddt=[90.0] * len(seq_ids),
         accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(len(seq_ids))],
         contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(len(seq_ids))],
-        display_name="Tick Demo / 链 A",
+        display_name="Tick Demo / Chain A",
     )
     return JobPanelData(
         job_name="demo",
@@ -78,8 +78,8 @@ def test_layout_wraps_blocks_and_preserves_label_width():
     assert layout.render_config.label_width >= base_config.label_width
     assert layout.blocks[0].end - layout.blocks[0].start == 5
     assert any(row.kind == "secondary" and row.label == "ranked_0_A" for row in layout.rows)
-    assert any(row.kind == "confidence" and row.label == "置信度" for row in layout.rows)
-    assert any(row.kind == "msa_query" and row.label == "查询序列" for row in layout.rows)
+    assert any(row.kind == "confidence" and row.label == "Confidence" for row in layout.rows)
+    assert any(row.kind == "msa_query" and row.label == "Query Sequence" for row in layout.rows)
     secondary_index = next(index for index, row in enumerate(layout.rows) if row.kind == "secondary")
     assert layout.rows[secondary_index + 1].kind == "confidence"
 
@@ -118,7 +118,7 @@ def test_turn_segments_render_as_curves_without_text_overlap():
         plddt=[90.0] * 8,
         accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(8)],
         contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(8)],
-        display_name="Turn Demo / 链 A",
+        display_name="Turn Demo / Chain A",
     )
     panel = JobPanelData(
         job_name="demo",
@@ -132,6 +132,7 @@ def test_turn_segments_render_as_curves_without_text_overlap():
 
     svg, _ = render_panel_svg(panel)
     assert 'class="turn-track"' in svg
+    assert "OpenFoldPanel Times New Roman" in svg
     assert ">TT<" not in svg
 
 
@@ -187,7 +188,7 @@ def test_layout_uses_real_homolog_identifiers_without_extra_secondary_annotation
 
     svg, _ = render_panel_svg(panel)
     assert ">sp|P01664|KV3AC_MOUSE<" in svg
-    assert "代表同源序列" not in svg
+    assert "Represents homolog sequence" not in svg
     assert ">β1<" in svg
     assert ">β2<" in svg
     assert ">β3<" in svg
@@ -298,7 +299,7 @@ def test_confidence_track_renders_one_cell_per_residue():
         plddt=[95.0, 82.0, 61.0, 24.0],
         accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(4)],
         contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(4)],
-        display_name="Confidence Demo / 链 A",
+        display_name="Confidence Demo / Chain A",
     )
     panel = JobPanelData(
         job_name="demo",
@@ -349,7 +350,7 @@ def test_disulfide_positions_render_as_s_in_contact_track_and_keep_multi_outline
                 bridge_scope="intramolecular",
             )
         ],
-        display_name="Disulfide Demo / 链 A",
+        display_name="Disulfide Demo / Chain A",
     )
     panel = JobPanelData(
         job_name="demo",
@@ -394,7 +395,7 @@ def test_interchain_disulfide_positions_render_as_cyan_s_in_contact_track():
                 bridge_scope="intermolecular",
             )
         ],
-        display_name="Interchain Disulfide Demo / 链 A",
+        display_name="Interchain Disulfide Demo / Chain A",
     )
     panel = JobPanelData(
         job_name="demo",

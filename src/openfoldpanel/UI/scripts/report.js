@@ -102,7 +102,7 @@
       clearChildren(listNode);
       return;
     }
-    titleNode.textContent = items.length > 1 ? `${title}（${items.length}）` : title;
+    titleNode.textContent = items.length > 1 ? `${title} (${items.length})` : title;
     clearChildren(listNode);
     items.forEach((warning) => {
       const listItem = document.createElement("li");
@@ -162,7 +162,7 @@
     }
 
     renderSummary(panel.summaryItems || []);
-    renderWarnings(chainWarnings, chainWarningsTitle, chainWarningList, "当前链提示", panel.warnings || []);
+    renderWarnings(chainWarnings, chainWarningsTitle, chainWarningList, "Current Chain Notes", panel.warnings || []);
     mountFigure(panel.referenceChain);
 
     if (pushHash) {
@@ -181,7 +181,7 @@
     chainSelect.addEventListener("change", (event) => activateChain(event.target.value));
   }
 
-  renderWarnings(jobWarnings, jobWarningsTitle, jobWarningList, "任务级提示", report.warnings || []);
+  renderWarnings(jobWarnings, jobWarningsTitle, jobWarningList, "Job-level Notes", report.warnings || []);
 
   const requestedChain = window.location.hash.replace("#chain-", "");
   const initialChain = panelByChain.has(requestedChain) ? requestedChain : report.defaultReferenceChain;

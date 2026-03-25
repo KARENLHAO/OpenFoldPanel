@@ -34,8 +34,8 @@ def humanize_chain_label(chain_id: str) -> str:
     """Return a readable chain label."""
 
     if chain_id == "_":
-        return "未命名链"
-    return f"链 {chain_id}"
+        return "Unnamed Chain"
+    return f"Chain {chain_id}"
 
 
 def humanize_model_name(structure_name: str, chain_id: str) -> str:
@@ -57,12 +57,12 @@ def summarize_msa_database_path(value: str | Path | None) -> str:
     """Convert an MSA database path into a compact human-facing label."""
 
     if value is None:
-        return "未设置"
+        return "Not set"
 
     path = Path(value)
     leaf = path.name or str(path).rstrip("/").split("/")[-1]
     if not leaf:
-        return "未设置"
+        return "Not set"
 
     lowered_leaf = leaf.casefold()
     lowered_stem = Path(leaf).stem.casefold()

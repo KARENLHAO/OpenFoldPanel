@@ -14,8 +14,10 @@ SUPPORTED_ARCHIVE_SUFFIXES = {
     ".tar.xz",
 }
 
-DEFAULT_FONT_FAMILY = '"WenQuanYi Zen Hei", "Noto Sans CJK SC", "Microsoft YaHei", "Liberation Sans", "Nimbus Sans", sans-serif'
-DEFAULT_HEADING_FONT_FAMILY = '"Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong", "WenQuanYi Zen Hei", "Liberation Serif", "Nimbus Roman", serif'
+EMBEDDED_TIMES_NEW_ROMAN_ALIAS = "OpenFoldPanel Times New Roman"
+TIMES_NEW_ROMAN_FONT_STACK = f'"{EMBEDDED_TIMES_NEW_ROMAN_ALIAS}", "Times New Roman", Times, serif'
+DEFAULT_FONT_FAMILY = TIMES_NEW_ROMAN_FONT_STACK
+DEFAULT_HEADING_FONT_FAMILY = TIMES_NEW_ROMAN_FONT_STACK
 DEFAULT_COLUMNS = 80
 DEFAULT_FONT_SIZE = 12
 DEFAULT_HYDROPATHY_WINDOW = 3
