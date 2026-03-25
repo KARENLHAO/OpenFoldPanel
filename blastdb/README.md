@@ -16,9 +16,10 @@ For long-term reproducible use, the recommended workflow is to download the raw 
 | UniProt Swiss-Prot FASTA | `swissprot_fasta/` | General protein sequence source input | Build a database, then pass the generated prefix |
 | NCBI `swissprot` BLAST DB | `swissprot/` | Prebuilt Swiss-Prot BLAST database | Pass `./blastdb/swissprot/swissprot` directly |
 | NCBI `pdbaa` BLAST DB | `pdbaa/` | Prebuilt PDBAA BLAST database | Pass `./blastdb/pdbaa/pdbaa` directly |
-| Raw PDB cluster files | `pdb_cluster_src/` | `pdb_seqres.txt` and `clusters-by-entity-{50,70,90,95}.txt` | Raw inputs retained for future database tooling |
+| Raw PDB cluster files | `pdb_cluster_src/` | `pdb_seqres.txt` and `clusters-by-entity-{50,70,90,95}.txt` | Inputs for building chain-level `PDBAA50/70/90/95` FASTA and BLAST databases |
 | Download script | `Download_db.sh` | Downloads raw files and prebuilt BLAST databases | Fetch resources first |
 | Generic build script | `Build_blastdb.sh` | Builds a BLAST database from FASTA or sequence files | FASTA -> BLAST prefix |
+| PDBAA cluster build script | `Build_pdbaa_clusters.py` | Builds `PDBAA50/70/90/95` chain-level FASTA and optional BLAST prefixes from raw PDB cluster data | Use after `pdb-clusters` download |
 
 ## Dependency Requirements
 
@@ -37,13 +38,14 @@ If you use a `conda` / `mamba` environment, installing `blast` or `ncbi-blast+` 
 
 ## Recommended Workflow
 
-Two common paths are supported:
+Three common paths are supported:
 
 1. Use the prebuilt `pdbaa` BLAST database directly
 2. Download a raw FASTA file and build your own database with `Build_blastdb.sh`
+3. Download `pdb-clusters` and build chain-level `PDBAA50/70/90/95` with `Build_pdbaa_clusters.py`
 
 If you only want the fastest way to get the pipeline working, using `pdbaa` directly is the simplest option.
-Raw `PDB cluster` files remain in `pdb_cluster_src/`, and their downstream handling will be expanded in a future version.
+If you need representative-only PDB sequence databases that align with the RCSB entity clusters at `50 / 70 / 90 / 95%` identity, use the `PDBAA50/70/90/95` workflow below.
 
 ## Download Script Usage
 
@@ -115,11 +117,82 @@ python -m openfoldpanel \
   --max-homologs-displayed 5
 ```
 
-## PDB Cluster Notes
+## Build PDBAA50 / 70 / 90 / 95
 
-`pdb_cluster_src/` keeps raw files such as `pdb_seqres.txt` and `clusters-by-entity-{50,70,90,95}.txt` so that future `PDB cluster` database workflows can be built on top of them.
+`Build_pdbaa_clusters.py` converts RCSB cluster representatives into chain-level FASTA headers like `pdb|5B8C|A`, then optionally builds BLAST database prefixes from those FASTA files.
 
-The current version does not yet provide an official build path for `PDBAA50/70/90/95`. That workflow will be documented in a later update.
+The workflow is:
+
+1. Treat `clusters-by-entity-{50,70,90,95}.txt` as the authoritative representative definition
+2. Keep only the first token from each cluster line
+3. Keep only PDB representative tokens such as `5B8C_2`; skip `AF_...` and `MA_...`
+4. Use `polymer_entity` metadata to resolve `entry + entity -> canonical auth_asym_id`
+5. Pull the sequence itself from local `pdb_seqres.txt` protein-chain records only
+6. Write FASTA headers as `pdb|ENTRY|CHAIN`
+
+Required input directory contents:
+
+- `pdb_seqres.txt`
+- `clusters-by-entity-50.txt`
+- `clusters-by-entity-70.txt`
+- `clusters-by-entity-90.txt`
+- `clusters-by-entity-95.txt`
+
+Build a single identity FASTA:
+
+```bash
+python ./blastdb/Build_pdbaa_clusters.py \
+  --identity 95 \
+  --pdb-cluster-src ./blastdb/pdb_cluster_src
+```
+
+Build the FASTA and BLAST database prefix together:
+
+```bash
+python ./blastdb/Build_pdbaa_clusters.py \
+  --identity 95 \
+  --pdb-cluster-src ./blastdb/pdb_cluster_src \
+  --build-blastdb
+```
+
+Build every supported identity in one pass:
+
+```bash
+python ./blastdb/Build_pdbaa_clusters.py \
+  --all \
+  --pdb-cluster-src ./blastdb/pdb_cluster_src \
+  --build-blastdb
+```
+
+Outputs are written under `./blastdb/build/`:
+
+- `./blastdb/build/pdbaa50/pdbaa50.fasta`
+- `./blastdb/build/pdbaa50/pdbaa50`
+- `./blastdb/build/pdbaa70/pdbaa70.fasta`
+- `./blastdb/build/pdbaa70/pdbaa70`
+- `./blastdb/build/pdbaa90/pdbaa90.fasta`
+- `./blastdb/build/pdbaa90/pdbaa90`
+- `./blastdb/build/pdbaa95/pdbaa95.fasta`
+- `./blastdb/build/pdbaa95/pdbaa95`
+
+The build cache is shared across identities:
+
+- `./blastdb/build/pdbaa_cache/entity_chain_map.json`
+
+Recommended acceptance checks:
+
+- FASTA headers match `^pdb\|[0-9A-Z]{4}\|[^|[:space:]]+$`
+- FASTA does not contain `AF_`, `MA_`, or `mol:na`
+- Multi-chain entries such as `5B8C` resolve to chain-level headers rather than entity tokens
+- `blastdbcmd` can retrieve a record directly by chain-level identifier
+
+Example:
+
+```bash
+blastdbcmd \
+  -db ./blastdb/build/pdbaa95/pdbaa95 \
+  -entry 'pdb|5B8C|A'
+```
 
 ## Use a Prebuilt BLAST Database Directly
 
