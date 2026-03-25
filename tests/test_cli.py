@@ -44,8 +44,15 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "查询序列" in html_text
     assert "可及性" in html_text
     assert "疏水性" in html_text
-    assert "深蓝表示埋藏/隐藏，浅蓝表示暴露" in html_text
-    assert "橙色表示疏水，蓝色表示亲水" in html_text
+    assert "深蓝表示表面可及性很低，残基大多位于内部。" in html_text
+    assert "灰蓝表示部分暴露，位于埋藏与暴露之间的过渡状态。" in html_text
+    assert "浅蓝表示残基较容易接触溶剂，表面暴露程度较高。" in html_text
+    assert "金色表示残基显著暴露在表面，通常最容易接触外部环境。" in html_text
+    assert "橙色表示局部更偏疏水，常见于内部或脂质环境偏好的区域。" in html_text
+    assert "灰色表示局部理化性质接近中间态，不明显偏向亲水或疏水。" in html_text
+    assert "蓝色表示局部更偏亲水，更容易与水相环境相互作用。" in html_text
+    assert "分子内二硫键" in html_text
+    assert "分子间二硫键" in html_text
     assert "置信度" in html_text
     assert "OpenFoldPanel / ARCHIVE" in html_text
     assert "FoldScript 风格图板" not in html_text
@@ -93,8 +100,16 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert 'data-legend-kind="strand"' in html_text
     assert 'data-legend-kind="helix"' in html_text
     assert 'data-legend-kind="turn"' in html_text
+    assert 'data-legend-kind="accessibility-buried"' in html_text
+    assert 'data-legend-kind="accessibility-intermediate"' in html_text
+    assert 'data-legend-kind="accessibility-accessible"' in html_text
+    assert 'data-legend-kind="accessibility-highly-exposed"' in html_text
+    assert 'data-legend-kind="hydropathy-hydrophobic"' in html_text
+    assert 'data-legend-kind="hydropathy-intermediate"' in html_text
+    assert 'data-legend-kind="hydropathy-hydrophilic"' in html_text
     assert 'data-legend-kind="confidence-very-high"' in html_text
-    assert 'data-legend-kind="contact-disulfide"' in html_text
+    assert 'data-legend-kind="contact-disulfide-intra"' in html_text
+    assert 'data-legend-kind="contact-disulfide-inter"' in html_text
     assert 'data-legend-kind="contact-multi"' in html_text
     assert 'data-current-chain-label' not in html_text
     assert 'supporting-rail' not in html_text

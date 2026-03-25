@@ -221,8 +221,11 @@ def _build_theme_vars(config: RenderConfig) -> str:
             f"  --ofp-color-msa-default-bg: {colors['msa_default_bg']};",
             f"  --ofp-color-msa-default-text: {colors['msa_default_text']};",
             f"  --ofp-color-accessibility-buried: {colors['accessibility_buried']};",
+            f"  --ofp-color-accessibility-intermediate: {colors['accessibility_intermediate']};",
             f"  --ofp-color-accessibility-accessible: {colors['accessibility_accessible']};",
+            f"  --ofp-color-accessibility-highly-exposed: {colors['accessibility_highly_exposed']};",
             f"  --ofp-color-hydrophobic: {colors['hydropathy_hydrophobic']};",
+            f"  --ofp-color-hydropathy-intermediate: {colors['hydropathy_intermediate']};",
             f"  --ofp-color-hydrophilic: {colors['hydropathy_hydrophilic']};",
             f"  --ofp-color-confidence-very-high: {colors['plddt_very_high']};",
             f"  --ofp-color-confidence-confident: {colors['plddt_confident']};",
@@ -233,6 +236,7 @@ def _build_theme_vars(config: RenderConfig) -> str:
             f"  --ofp-color-contact-weak: {colors['contact_weak']};",
             f"  --ofp-color-contact-multi-outline: {colors['contact_multi_outline']};",
             f"  --ofp-color-disulfide: {colors['disulfide_symbol']};",
+            f"  --ofp-color-disulfide-inter: {colors['disulfide_inter_symbol']};",
             f"  --ofp-color-atmosphere: {colors['accent_border']};",
         ]
     )

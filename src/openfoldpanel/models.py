@@ -147,9 +147,10 @@ class ContactEntry:
 @dataclass(slots=True)
 class DisulfideBond:
     residue_index_a: int
-    residue_index_b: int
+    residue_index_b: int | None
     chain_a: str
     chain_b: str
+    bridge_scope: str = "intramolecular"
 
 
 @dataclass(slots=True)

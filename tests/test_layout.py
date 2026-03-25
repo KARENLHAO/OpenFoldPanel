@@ -340,7 +340,15 @@ def test_disulfide_positions_render_as_s_in_contact_track_and_keep_multi_outline
         plddt=[90.0] * 4,
         accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(4)],
         contacts=contacts,
-        disulfides=[DisulfideBond(residue_index_a=1, residue_index_b=3, chain_a="A", chain_b="A")],
+        disulfides=[
+            DisulfideBond(
+                residue_index_a=1,
+                residue_index_b=3,
+                chain_a="A",
+                chain_b="A",
+                bridge_scope="intramolecular",
+            )
+        ],
         display_name="Disulfide Demo / 链 A",
     )
     panel = JobPanelData(
@@ -360,6 +368,48 @@ def test_disulfide_positions_render_as_s_in_contact_track_and_keep_multi_outline
     assert ">#<" not in svg
     assert "#5FA79A" in svg
     assert 'stroke="#2d7068"' in svg
+
+
+def test_interchain_disulfide_positions_render_as_cyan_s_in_contact_track():
+    config = build_render_config(columns=4, font_size=12)
+    axis = [
+        SequenceAxisPosition(index, "A", index + 1, "", "CYS" if index == 1 else "ALA", "C", str(index + 1))
+        for index in range(4)
+    ]
+    hydropathy = compute_hydropathy(axis, window=3)
+    model = ModelTracks(
+        name="ranked_0_A",
+        source_path="model.pdb",
+        chain="A",
+        secondary_structure=[SecondaryStructureEntry(index, "C", "coil") for index in range(4)],
+        plddt=[90.0] * 4,
+        accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(4)],
+        contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(4)],
+        disulfides=[
+            DisulfideBond(
+                residue_index_a=1,
+                residue_index_b=None,
+                chain_a="A",
+                chain_b="B",
+                bridge_scope="intermolecular",
+            )
+        ],
+        display_name="Interchain Disulfide Demo / 链 A",
+    )
+    panel = JobPanelData(
+        job_name="demo",
+        reference_chain="A",
+        sequence_axis=axis,
+        models=[model],
+        msa=MSAData(enabled=False, query="ACAC", rows=[MSARow(identifier="query_sequence", sequence="ACAC", is_query=True)]),
+        hydropathy=hydropathy,
+        render_config=config,
+    )
+
+    svg, _ = render_panel_svg(panel)
+
+    assert svg.count(">S<") == 1
+    assert "#35B9C7" in svg
 
 
 def test_ticks_prefer_round_tens_when_terminal_label_would_overlap():

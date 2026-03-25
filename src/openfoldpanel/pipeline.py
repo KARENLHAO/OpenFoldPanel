@@ -319,7 +319,11 @@ def _build_panel_data_for_reference_chain(
             else None
             for position in axis
         ]
-        disulfides = infer_disulfides(alignment.residue_by_axis_index)
+        disulfides = infer_disulfides(
+            structure,
+            alignment.residue_by_axis_index,
+            current_chain_id=chain.chain_id,
+        )
         model_tracks.append(
             ModelTracks(
                 name=f"{structure.name}_{chain.chain_id}",

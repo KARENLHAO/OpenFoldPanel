@@ -328,14 +328,15 @@ def _render_contacts_row(panel_data: JobPanelData, model_index: int | None, bloc
     grid_x = config.margin + config.label_width
     model = panel_data.models[model_index]
     track = model.contacts
-    disulfide_indices = _disulfide_residue_indices(model.disulfides)
+    disulfide_scopes = _disulfide_scopes_by_residue(model.disulfides)
     pieces: list[str] = []
     for local_index, axis_index in enumerate(range(block.start, block.end)):
         if axis_index >= len(track):
             continue
         entry = track[axis_index]
         x = grid_x + local_index * config.cell_width
-        if axis_index in disulfide_indices:
+        disulfide_scope = disulfide_scopes.get(axis_index)
+        if disulfide_scope is not None:
             pieces.append(_render_contact_cell_background(x, y, height, config))
             pieces.append(
                 _render_contact_symbol(
@@ -345,7 +346,7 @@ def _render_contacts_row(panel_data: JobPanelData, model_index: int | None, bloc
                     height,
                     config,
                     symbol_override="S",
-                    color_override=config.colors["disulfide_symbol"],
+                    color_override=_disulfide_color(disulfide_scope, config.colors),
                 )
             )
         elif entry.symbol:
@@ -392,12 +393,19 @@ def _render_contact_symbol(
     return f"{outline}\n{text}" if outline else text
 
 
-def _disulfide_residue_indices(disulfides) -> set[int]:
-    indices: set[int] = set()
+def _disulfide_scopes_by_residue(disulfides) -> dict[int, str]:
+    scopes: dict[int, str] = {}
     for bond in disulfides:
-        indices.add(bond.residue_index_a)
-        indices.add(bond.residue_index_b)
-    return indices
+        scopes[bond.residue_index_a] = bond.bridge_scope
+        if bond.residue_index_b is not None:
+            scopes[bond.residue_index_b] = bond.bridge_scope
+    return scopes
+
+
+def _disulfide_color(scope: str, colors: dict[str, str]) -> str:
+    if scope == "intermolecular":
+        return colors["disulfide_inter_symbol"]
+    return colors["disulfide_symbol"]
 
 
 def _secondary_annotations(track: list[SecondaryStructureEntry]) -> list[StructureAnnotation]:

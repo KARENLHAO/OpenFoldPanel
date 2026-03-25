@@ -101,6 +101,7 @@ COLORS = {
     "contact_weak": "#2f68a6",
     "contact_multi_outline": "#2d7068",
     "disulfide_symbol": "#5FA79A",
+    "disulfide_inter_symbol": "#35B9C7",
     "plddt_very_high": "#174d86",
     "plddt_confident": "#5387aa",
     "plddt_low": "#c59133",

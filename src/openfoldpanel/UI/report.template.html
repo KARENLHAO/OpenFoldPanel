@@ -172,28 +172,67 @@ __OFP_INLINE_STYLES__
                             <small>表示该位点发生了保守替换，残基性质相近但不完全相同。</small>
                           </span>
                         </div>
-                        <div class="ofp-legend-item legend-item" data-legend-kind="accessibility">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-buried">
                           <span class="ofp-legend-symbol">
-                            <span class="ofp-track-strip">
-                              <span class="ofp-track-cell is-accessibility-buried"></span>
-                              <span class="ofp-track-cell is-accessibility-accessible"></span>
-                            </span>
+                            <span class="ofp-track-cell is-accessibility-buried"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>可及性</strong>
-                            <small>深蓝表示埋藏/隐藏，浅蓝表示暴露，用于反映残基表面可接近程度。</small>
+                            <strong>可及性 / 埋藏</strong>
+                            <small>深蓝表示表面可及性很低，残基大多位于内部。</small>
                           </span>
                         </div>
-                        <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-intermediate">
                           <span class="ofp-legend-symbol">
-                            <span class="ofp-track-strip">
-                              <span class="ofp-track-cell is-hydrophobic"></span>
-                              <span class="ofp-track-cell is-hydrophilic"></span>
-                            </span>
+                            <span class="ofp-track-cell is-accessibility-intermediate"></span>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>疏水性</strong>
-                            <small>橙色表示疏水，蓝色表示亲水，体现残基局部理化性质分布。</small>
+                            <strong>可及性 / 中间</strong>
+                            <small>灰蓝表示部分暴露，位于埋藏与暴露之间的过渡状态。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-accessible">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-cell is-accessibility-accessible"></span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>可及性 / 可及</strong>
+                            <small>浅蓝表示残基较容易接触溶剂，表面暴露程度较高。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="accessibility-highly-exposed">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-cell is-accessibility-highly-exposed"></span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>可及性 / 高度暴露</strong>
+                            <small>金色表示残基显著暴露在表面，通常最容易接触外部环境。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy-hydrophobic">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-cell is-hydrophobic"></span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>疏水性 / 疏水</strong>
+                            <small>橙色表示局部更偏疏水，常见于内部或脂质环境偏好的区域。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy-intermediate">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-cell is-hydropathy-intermediate"></span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>疏水性 / 中间</strong>
+                            <small>灰色表示局部理化性质接近中间态，不明显偏向亲水或疏水。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="hydropathy-hydrophilic">
+                          <span class="ofp-legend-symbol">
+                            <span class="ofp-track-cell is-hydrophilic"></span>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>疏水性 / 亲水</strong>
+                            <small>蓝色表示局部更偏亲水，更容易与水相环境相互作用。</small>
                           </span>
                         </div>
                       </div>
@@ -289,7 +328,7 @@ __OFP_INLINE_STYLES__
                             <small>__OFP_LEGEND_CONTACT_WEAK_TEXT__</small>
                           </span>
                         </div>
-                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-disulfide">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-disulfide-intra">
                           <span class="ofp-legend-symbol">
                             <svg viewBox="0 0 44 20" aria-hidden="true">
                               <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
@@ -297,8 +336,20 @@ __OFP_INLINE_STYLES__
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>二硫键</strong>
-                            <small>表示该位点参与形成二硫键。</small>
+                            <strong>分子内二硫键</strong>
+                            <small>绿色 S 表示同一条蛋白链内部的 CYS-CYS 二硫键。</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="contact-disulfide-inter">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 44 20" aria-hidden="true">
+                              <rect class="ofp-legend-contact-bg" x="2" y="2" width="16" height="16" />
+                              <text class="ofp-legend-contact-text is-disulfide-inter" x="10" y="13">S</text>
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>分子间二硫键</strong>
+                            <small>青色 S 表示不同蛋白链之间的 CYS-CYS 二硫键。</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="contact-same-position">

@@ -164,13 +164,28 @@
   border-color: transparent;
 }
 
+.ofp-track-cell.is-accessibility-intermediate {
+  background: var(--ofp-color-accessibility-intermediate);
+  border-color: transparent;
+}
+
 .ofp-track-cell.is-accessibility-accessible {
   background: var(--ofp-color-accessibility-accessible);
   border-color: transparent;
 }
 
+.ofp-track-cell.is-accessibility-highly-exposed {
+  background: var(--ofp-color-accessibility-highly-exposed);
+  border-color: transparent;
+}
+
 .ofp-track-cell.is-hydrophobic {
   background: var(--ofp-color-hydrophobic);
+  border-color: transparent;
+}
+
+.ofp-track-cell.is-hydropathy-intermediate {
+  background: var(--ofp-color-hydropathy-intermediate);
   border-color: transparent;
 }
 
@@ -222,6 +237,10 @@
 
 .ofp-legend-contact-text.is-disulfide {
   fill: var(--ofp-color-disulfide);
+}
+
+.ofp-legend-contact-text.is-disulfide-inter {
+  fill: var(--ofp-color-disulfide-inter);
 }
 
 .ofp-legend-contact-outline {
