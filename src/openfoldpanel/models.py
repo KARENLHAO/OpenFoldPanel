@@ -83,6 +83,11 @@ class ParsedStructure:
     source_path: Path
     chains: dict[str, ChainRecord]
     format: str
+    original_source_path: Path | None = None
+
+    @property
+    def display_source_path(self) -> Path:
+        return self.original_source_path or self.source_path
 
 
 @dataclass(slots=True)

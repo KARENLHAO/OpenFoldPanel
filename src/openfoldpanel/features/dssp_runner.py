@@ -28,10 +28,16 @@ def find_dssp_executable() -> str | None:
     return None
 
 
-def run_dssp(structure_path: Path, logger: logging.Logger) -> tuple[dict[tuple[str, int, str], DSSPResidueFeature], list[str]]:
+def run_dssp(
+    structure_path: Path,
+    logger: logging.Logger,
+    *,
+    display_name: str | None = None,
+) -> tuple[dict[tuple[str, int, str], DSSPResidueFeature], list[str]]:
     """Execute DSSP and parse the result; degrade gracefully on errors."""
 
     executable = find_dssp_executable()
+    target_name = display_name or structure_path.name
     if executable is None:
         return {}, ["DSSP executable not found; using geometric fallback for secondary structure and accessibility."]
 
@@ -50,21 +56,21 @@ def run_dssp(structure_path: Path, logger: logging.Logger) -> tuple[dict[tuple[s
                 break
         except (MissingExecutableError, ExternalToolError) as exc:
             last_error = exc
-            logger.debug("DSSP command variant failed for %s: %s", structure_path.name, " ".join(command))
+            logger.debug("DSSP command variant failed for %s: %s", target_name, " ".join(command))
             continue
 
     if not output.strip():
         if last_error is not None:
-            logger.warning("DSSP failed for %s: %s", structure_path.name, last_error)
+            logger.warning("DSSP failed for %s: %s", target_name, last_error)
         else:
-            logger.warning("DSSP produced no output for %s", structure_path.name)
-        return {}, [f"DSSP failed for {structure_path.name}; using geometric fallback for secondary structure and accessibility."]
+            logger.warning("DSSP produced no output for %s", target_name)
+        return {}, [f"DSSP failed for {target_name}; using geometric fallback for secondary structure and accessibility."]
 
     try:
         parsed = parse_dssp_output(_trim_to_classic_dssp(output))
     except Exception as exc:
-        logger.warning("Unable to parse DSSP output for %s: %s", structure_path.name, exc)
-        return {}, [f"DSSP output could not be parsed for {structure_path.name}; using geometric fallback."]
+        logger.warning("Unable to parse DSSP output for %s: %s", target_name, exc)
+        return {}, [f"DSSP output could not be parsed for {target_name}; using geometric fallback."]
     return parsed, []
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tarfile
+import zipfile
 from importlib import resources
 
 import pytest
@@ -10,7 +11,7 @@ import openfoldpanel.pipeline as pipeline_module
 from openfoldpanel.cli import build_parser, main
 from openfoldpanel.constants import ALLOWED_EVALUES, DEFAULT_EVALUE
 from openfoldpanel.utils.text import summarize_msa_database_path
-from tests.conftest import write_test_pdb
+from tests.conftest import write_test_mmcif, write_test_pdb
 
 
 def test_cli_default_outputs_multi_chain_reports(tmp_path):
@@ -309,6 +310,70 @@ def test_cli_marks_partial_success_when_pdf_export_fails(tmp_path, monkeypatch):
     summary_text = (job_dir / "summary.txt").read_text()
     assert "Job Status: Partial Success" in summary_text
     assert "CairoSVG is not installed; PDF export was skipped." in summary_text
+
+
+def test_cli_normalizes_cif_input_to_pdb_for_dssp_but_keeps_original_source_name(tmp_path, monkeypatch):
+    input_path = write_test_mmcif(tmp_path / "single_model.cif")
+    outdir = tmp_path / "out"
+    seen_dssp_inputs = []
+
+    def fake_run_dssp(structure_path, logger):
+        seen_dssp_inputs.append(structure_path)
+        return {}, []
+
+    monkeypatch.setattr(pipeline_module, "run_dssp", fake_run_dssp)
+
+    exit_code = main(["--input", str(input_path), "--outdir", str(outdir)])
+    assert exit_code == 0
+
+    assert seen_dssp_inputs
+    assert all(path.suffix == ".pdb" for path in seen_dssp_inputs)
+    payload = json.loads((outdir / "single_model" / "tracks.json").read_text())
+    assert payload["chain_panels"][0]["models"][0]["source_path"].endswith("single_model.cif")
+    logs_text = (outdir / "single_model" / "logs.txt").read_text()
+    assert "running DSSP for single_model.cif" in logs_text
+    assert "running DSSP for single_model.pdb" not in logs_text
+
+
+def test_cli_marks_partial_success_when_one_archive_model_cannot_be_normalized_to_pdb(tmp_path):
+    archive_path = tmp_path / "batch.zip"
+    with zipfile.ZipFile(archive_path, "w") as zf:
+        zf.writestr("job_a/ranked_1.pdb", write_test_pdb(tmp_path / "ranked_1.pdb").read_text())
+        zf.writestr("job_a/ranked_bad.cif", write_test_mmcif(tmp_path / "ranked_bad.cif", chain_id="AA").read_text())
+
+    outdir = tmp_path / "out"
+    exit_code = main(["--input", str(archive_path), "--outdir", str(outdir)])
+    assert exit_code == 0
+
+    job_dir = outdir / "job_a"
+    payload = json.loads((job_dir / "tracks.json").read_text())
+    assert payload["status"] == "partial_success"
+    assert (job_dir / "report.html").exists()
+    summary_text = (job_dir / "summary.txt").read_text()
+    assert "Failed to normalize ranked_bad.cif" in summary_text
+
+
+def test_cli_archive_mixed_pdb_and_cif_inputs_are_normalized_before_dssp(tmp_path, monkeypatch):
+    archive_path = tmp_path / "mixed.zip"
+    with zipfile.ZipFile(archive_path, "w") as zf:
+        zf.writestr("job_a/ranked_1.pdb", write_test_pdb(tmp_path / "ranked_1.pdb").read_text())
+        zf.writestr("job_a/ranked_2.cif", write_test_mmcif(tmp_path / "ranked_2.cif").read_text())
+
+    outdir = tmp_path / "out"
+    seen_dssp_inputs = []
+
+    def fake_run_dssp(structure_path, logger):
+        seen_dssp_inputs.append(structure_path)
+        return {}, []
+
+    monkeypatch.setattr(pipeline_module, "run_dssp", fake_run_dssp)
+
+    exit_code = main(["--input", str(archive_path), "--outdir", str(outdir)])
+    assert exit_code == 0
+
+    assert len({path.name for path in seen_dssp_inputs}) == 2
+    assert all(path.suffix == ".pdb" for path in seen_dssp_inputs)
+    assert (outdir / "job_a" / "report.html").exists()
 
 
 def test_ui_resources_are_available_from_package():

@@ -16,24 +16,24 @@ except ImportError:  # pragma: no cover - exercised in environments without gemm
     gemmi = None
 
 
-def parse_structure(path: Path, logger: logging.Logger) -> ParsedStructure:
+def parse_structure(path: Path, logger: logging.Logger, *, original_source_path: Path | None = None) -> ParsedStructure:
     """Parse a PDB or mmCIF file into a normalized in-memory representation."""
 
     lower = path.name.lower()
     if gemmi is not None:
         try:
-            return _parse_with_gemmi(path)
+            return _parse_with_gemmi(path, original_source_path=original_source_path)
         except Exception as exc:  # pragma: no cover - best-effort fallback
             logger.warning("Gemmi failed for %s, falling back to pure Python parser: %s", path.name, exc)
 
     if lower.endswith(".pdb"):
-        return _parse_pdb_text(path)
+        return _parse_pdb_text(path, original_source_path=original_source_path)
     if lower.endswith((".cif", ".mmcif")):
-        return _parse_mmcif_text(path)
+        return _parse_mmcif_text(path, original_source_path=original_source_path)
     raise ValueError(f"Unsupported structure format: {path}")
 
 
-def _parse_with_gemmi(path: Path) -> ParsedStructure:
+def _parse_with_gemmi(path: Path, *, original_source_path: Path | None = None) -> ParsedStructure:
     structure = gemmi.read_structure(str(path))
     model = structure[0]
     chains: dict[str, ChainRecord] = {}
@@ -86,10 +86,17 @@ def _parse_with_gemmi(path: Path) -> ParsedStructure:
             chains[chain.name or "_"] = ChainRecord(chain_id=chain.name or "_", residues=residues, entity_type=entity_type)
 
     structure_format = "mmcif" if path.suffix.lower() in {".cif", ".mmcif"} else "pdb"
-    return ParsedStructure(name=path.stem, source_path=path, chains=chains, format=structure_format)
+    display_path = original_source_path or path
+    return ParsedStructure(
+        name=display_path.stem,
+        source_path=path,
+        chains=chains,
+        format=structure_format,
+        original_source_path=original_source_path,
+    )
 
 
-def _parse_pdb_text(path: Path) -> ParsedStructure:
+def _parse_pdb_text(path: Path, *, original_source_path: Path | None = None) -> ParsedStructure:
     chain_residues: dict[str, dict[tuple[int, str, str, bool], list[AtomRecord]]] = defaultdict(lambda: defaultdict(list))
 
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -142,10 +149,17 @@ def _parse_pdb_text(path: Path) -> ParsedStructure:
                 )
             )
         chains[chain_id] = ChainRecord(chain_id=chain_id, residues=residues, entity_type=entity_type)
-    return ParsedStructure(name=path.stem, source_path=path, chains=chains, format="pdb")
+    display_path = original_source_path or path
+    return ParsedStructure(
+        name=display_path.stem,
+        source_path=path,
+        chains=chains,
+        format="pdb",
+        original_source_path=original_source_path,
+    )
 
 
-def _parse_mmcif_text(path: Path) -> ParsedStructure:
+def _parse_mmcif_text(path: Path, *, original_source_path: Path | None = None) -> ParsedStructure:
     lines = path.read_text(encoding="utf-8").splitlines()
     atom_fields: list[str] = []
     atom_rows: list[list[str]] = []
@@ -244,7 +258,14 @@ def _parse_mmcif_text(path: Path) -> ParsedStructure:
                 )
             )
         chains[chain_id] = ChainRecord(chain_id=chain_id, residues=residues, entity_type=entity_type)
-    return ParsedStructure(name=path.stem, source_path=path, chains=chains, format="mmcif")
+    display_path = original_source_path or path
+    return ParsedStructure(
+        name=display_path.stem,
+        source_path=path,
+        chains=chains,
+        format="mmcif",
+        original_source_path=original_source_path,
+    )
 
 
 def select_reference_chain(structure: ParsedStructure, requested_chain: str) -> str:
@@ -252,7 +273,7 @@ def select_reference_chain(structure: ParsedStructure, requested_chain: str) -> 
 
     protein_chains = _protein_chain_ids(structure)
     if not protein_chains:
-        raise ValueError(f"No protein chain found in structure: {structure.source_path}")
+        raise ValueError(f"No protein chain found in structure: {structure.display_source_path}")
 
     normalized_request = _normalize_reference_request(requested_chain)
     if normalized_request != "AUTO":
@@ -260,9 +281,11 @@ def select_reference_chain(structure: ParsedStructure, requested_chain: str) -> 
             return protein_chains[0]
         chain = structure.chains.get(requested_chain)
         if chain is None:
-            raise ValueError(f"Requested chain {requested_chain} not found in {structure.source_path.name}")
+            raise ValueError(f"Requested chain {requested_chain} not found in {structure.display_source_path.name}")
         if chain.entity_type != "protein":
-            raise ValueError(f"Requested chain {requested_chain} is not a protein chain in {structure.source_path.name}")
+            raise ValueError(
+                f"Requested chain {requested_chain} is not a protein chain in {structure.display_source_path.name}"
+            )
         return requested_chain
 
     if "A" in protein_chains:
@@ -275,7 +298,7 @@ def collect_reference_chains(structure: ParsedStructure, requested_chain: str) -
 
     protein_chains = _protein_chain_ids(structure)
     if not protein_chains:
-        raise ValueError(f"No protein chain found in structure: {structure.source_path}")
+        raise ValueError(f"No protein chain found in structure: {structure.display_source_path}")
 
     normalized_request = _normalize_reference_request(requested_chain)
     if normalized_request == "ALL":

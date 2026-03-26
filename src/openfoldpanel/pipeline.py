@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from inspect import signature
 import logging
 import tempfile
 from collections.abc import Iterable
@@ -38,6 +39,7 @@ from openfoldpanel.models import (
 )
 from openfoldpanel.parsers.plddt_reader import residue_plddt
 from openfoldpanel.parsers.sequence_mapper import align_chain_to_axis, build_sequence_axis
+from openfoldpanel.parsers.structure_preprocessor import normalize_structure_to_pdb
 from openfoldpanel.parsers.structure_parser import (
     collect_reference_chains,
     get_chain_or_best_match,
@@ -157,6 +159,7 @@ def _run_job(
             job,
             logger,
             issues,
+            temp_dir=temp_dir,
             job_index=job_index,
             total_jobs=total_jobs,
         )
@@ -292,6 +295,7 @@ def _parse_job_structures(
     logger: logging.Logger,
     issues: JobIssues,
     *,
+    temp_dir: Path,
     job_index: int,
     total_jobs: int,
 ) -> list[ParsedStructure]:
@@ -306,12 +310,42 @@ def _parse_job_structures(
             structure_path.name,
         )
         try:
-            parsed_structures.append(parse_structure(structure_path, logger))
+            normalized_dir = _normalized_structure_output_dir(temp_dir, job, structure_path)
+            normalized_path = normalize_structure_to_pdb(structure_path, normalized_dir)
+        except Exception as exc:
+            message = f"Failed to normalize {structure_path.name}: {exc}"
+            logger.warning(message)
+            issues.add_partial(message)
+            continue
+        try:
+            parsed_structures.append(
+                parse_structure(
+                    normalized_path,
+                    logger,
+                    original_source_path=_display_source_path(job, structure_path),
+                )
+            )
         except Exception as exc:
             message = f"Failed to parse {structure_path.name}: {exc}"
             logger.warning(message)
             issues.add_partial(message)
     return parsed_structures
+
+
+def _display_source_path(job: JobDefinition, structure_path: Path) -> Path:
+    try:
+        return structure_path.relative_to(job.root_dir)
+    except ValueError:
+        return Path(structure_path.name)
+
+
+def _normalized_structure_output_dir(temp_dir: Path, job: JobDefinition, structure_path: Path) -> Path:
+    normalized_root = temp_dir / "normalized_structures" / job.name
+    try:
+        relative_parent = structure_path.parent.relative_to(job.root_dir)
+    except ValueError:
+        relative_parent = Path()
+    return ensure_directory(normalized_root / relative_parent)
 
 
 def _build_chain_panels(
@@ -444,31 +478,32 @@ def _build_panel_data_for_reference_chain(
     partial_reasons: list[str] = []
     model_tracks: list[ModelTracks] = []
     for structure_index, structure in enumerate(parsed_structures, start=1):
+        display_name = structure.display_source_path.name
         logger.info(
             "Job %s / Chain %s: processing model %s/%s (%s)",
             job_name,
             reference_chain_id,
             structure_index,
             len(parsed_structures),
-            structure.source_path.name,
+            display_name,
         )
         chain = get_chain_or_best_match(structure, reference_chain_id, reference_chain.sequence)
         if chain is None:
-            warning = f"Skipping {structure.source_path.name}: no compatible protein chain found."
+            warning = f"Skipping {display_name}: no compatible protein chain found."
             logger.warning(warning)
             warnings.append(warning)
             partial_reasons.append(warning)
             continue
 
-        logger.info("Job %s / Chain %s: aligning %s to reference axis", job_name, reference_chain_id, structure.source_path.name)
+        logger.info("Job %s / Chain %s: aligning %s to reference axis", job_name, reference_chain_id, display_name)
         alignment = align_chain_to_axis(axis, chain)
         warnings.extend(alignment.warnings)
 
-        logger.info("Job %s / Chain %s: running DSSP for %s", job_name, reference_chain_id, structure.source_path.name)
-        dssp_features, dssp_warnings = run_dssp(structure.source_path, logger)
+        logger.info("Job %s / Chain %s: running DSSP for %s", job_name, reference_chain_id, display_name)
+        dssp_features, dssp_warnings = _run_dssp_for_structure(structure, logger)
         warnings.extend(dssp_warnings)
 
-        logger.info("Job %s / Chain %s: computing tracks for %s", job_name, reference_chain_id, structure.source_path.name)
+        logger.info("Job %s / Chain %s: computing tracks for %s", job_name, reference_chain_id, display_name)
         secondary_structure = build_secondary_structure_track(axis, alignment.residue_by_axis_index, dssp_features)
         accessibility = build_accessibility_track(axis, alignment.residue_by_axis_index, dssp_features)
         contacts = compute_contacts(
@@ -493,7 +528,7 @@ def _build_panel_data_for_reference_chain(
         model_tracks.append(
             ModelTracks(
                 name=f"{structure.name}_{chain.chain_id}",
-                source_path=str(structure.source_path),
+                source_path=str(structure.display_source_path),
                 chain=chain.chain_id,
                 secondary_structure=secondary_structure,
                 plddt=plddt,
@@ -529,6 +564,15 @@ def _build_panel_data_for_reference_chain(
         status=panel_status,
     )
     return panel_data, partial_reasons
+
+
+def _run_dssp_for_structure(
+    structure: ParsedStructure,
+    logger: logging.Logger,
+):
+    if "display_name" in signature(run_dssp).parameters:
+        return run_dssp(structure.source_path, logger, display_name=structure.display_source_path.name)
+    return run_dssp(structure.source_path, logger)
 
 
 def _build_msa_data(
