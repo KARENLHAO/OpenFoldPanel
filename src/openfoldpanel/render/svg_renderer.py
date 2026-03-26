@@ -75,7 +75,8 @@ def _style_block(config) -> str:
         f'.sequence-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
         f'.contact-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
         '.confidence-cell{shape-rendering:crispEdges;}'
-        f'.turn-track{{fill:none;stroke:{config.colors["turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
+        f'.alpha-turn-track{{fill:none;stroke:{config.colors["alpha_turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
+        f'.beta-turn-track{{fill:none;stroke:{config.colors["beta_turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
         f'.soft-rule{{stroke:{config.colors["grid"]};stroke-width:0.9;}}'
         "</style>"
     )
@@ -221,7 +222,8 @@ def _render_secondary_row(panel_data: JobPanelData, model_index: int | None, blo
 
     helix_segments = _segment_ranges(model.secondary_structure, block, "helix")
     strand_segments = _segment_ranges(model.secondary_structure, block, "strand")
-    turn_segments = _segment_ranges(model.secondary_structure, block, "turn")
+    alpha_turn_segments = _segment_ranges(model.secondary_structure, block, "alpha_turn")
+    beta_turn_segments = _segment_ranges(model.secondary_structure, block, "beta_turn")
 
     for start, end in helix_segments:
         x = grid_x + (start - block.start) * config.cell_width
@@ -234,10 +236,14 @@ def _render_secondary_row(panel_data: JobPanelData, model_index: int | None, blo
     turn_height = row_height * 0.46
     turn_y = y + (height - turn_height) / 2.0
     turn_padding = min(max(config.cell_width * 0.12, 0.6), config.cell_width * 0.24)
-    for start, end in turn_segments:
+    for start, end in beta_turn_segments:
         x = grid_x + (start - block.start) * config.cell_width + turn_padding
         width = max((end - start) * config.cell_width - turn_padding * 2, config.cell_width * 0.56)
-        pieces.append(f'<path class="turn-track" d="{turn_path(x, turn_y, width, turn_height)}"/>')
+        pieces.append(f'<path class="beta-turn-track" d="{turn_path(x, turn_y, width, turn_height)}"/>')
+    for start, end in alpha_turn_segments:
+        x = grid_x + (start - block.start) * config.cell_width + turn_padding
+        width = max((end - start) * config.cell_width - turn_padding * 2, config.cell_width * 0.56)
+        pieces.append(f'<path class="alpha-turn-track" d="{turn_path(x, turn_y, width, turn_height)}"/>')
     return "\n".join(pieces)
 
 
@@ -434,7 +440,9 @@ def _structure_color(category: str, colors: dict[str, str]) -> str:
         return colors["strand_fill"]
     if category == "helix":
         return colors["helix_fill"]
-    return colors["turn_text"]
+    if category == "alpha_turn":
+        return colors["alpha_turn_text"]
+    return colors["beta_turn_text"]
 
 
 def _msa_style(residue: str, query_residue: str, kind: str, colors: dict[str, str]) -> tuple[str, str]:

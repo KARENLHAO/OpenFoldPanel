@@ -103,7 +103,11 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert 'data-legend-card="contacts"' in html_text
     assert 'data-legend-kind="strand"' in html_text
     assert 'data-legend-kind="helix"' in html_text
-    assert 'data-legend-kind="turn"' in html_text
+    assert 'data-legend-kind="alpha-turn"' in html_text
+    assert 'data-legend-kind="beta-turn"' in html_text
+    assert 'data-legend-kind="turn"' not in html_text
+    assert "Alpha Turn" in html_text
+    assert "Beta Turn" in html_text
     assert 'data-legend-kind="accessibility-buried"' in html_text
     assert 'data-legend-kind="accessibility-intermediate"' in html_text
     assert 'data-legend-kind="accessibility-accessible"' in html_text

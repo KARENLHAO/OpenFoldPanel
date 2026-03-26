@@ -93,7 +93,7 @@ def test_layout_wraps_blocks_and_preserves_label_width():
     assert layout.width - grid_end >= layout.render_config.font_size
 
 
-def test_turn_segments_render_as_curves_without_text_overlap():
+def test_turn_subtype_segments_render_as_distinct_curves_without_text_overlap():
     config = build_render_config(columns=8, font_size=12)
     axis = [
         SequenceAxisPosition(index, "A", index + 1, "", "ALA", "A", str(index + 1))
@@ -102,13 +102,13 @@ def test_turn_segments_render_as_curves_without_text_overlap():
     hydropathy = compute_hydropathy(axis, window=3)
     secondary = [
         SecondaryStructureEntry(0, "C", "coil"),
-        SecondaryStructureEntry(1, "T", "turn"),
-        SecondaryStructureEntry(2, "T", "turn"),
-        SecondaryStructureEntry(3, "T", "turn"),
+        SecondaryStructureEntry(1, "T", "beta_turn"),
+        SecondaryStructureEntry(2, "T", "beta_turn"),
+        SecondaryStructureEntry(3, "T", "beta_turn"),
         SecondaryStructureEntry(4, "C", "coil"),
-        SecondaryStructureEntry(5, "C", "coil"),
-        SecondaryStructureEntry(6, "C", "coil"),
-        SecondaryStructureEntry(7, "C", "coil"),
+        SecondaryStructureEntry(5, "T", "alpha_turn"),
+        SecondaryStructureEntry(6, "T", "alpha_turn"),
+        SecondaryStructureEntry(7, "T", "alpha_turn"),
     ]
     model = ModelTracks(
         name="ranked_0_A",
@@ -131,7 +131,9 @@ def test_turn_segments_render_as_curves_without_text_overlap():
     )
 
     svg, _ = render_panel_svg(panel)
-    assert 'class="turn-track"' in svg
+    assert 'class="alpha-turn-track"' in svg
+    assert 'class="beta-turn-track"' in svg
+    assert 'class="turn-track"' not in svg
     assert "OpenFoldPanel Times New Roman" in svg
     assert ">TT<" not in svg
 
