@@ -4,20 +4,29 @@ from __future__ import annotations
 
 
 def helix_path(x: float, y: float, width: float, height: float) -> str:
-    """Return a wavy SVG path for a helix segment."""
+    """Return a tightly curled SVG path for a helix segment."""
 
     mid_y = y + height / 2.0
-    step = max(width / 4.0, 4.0)
+    amplitude = max(min(height * 0.44, 5.0), 2.0)
+    loop_width = max(min(height * 0.95, width / 2.4 if width > 0 else height), 4.4)
     path = [f"M {x:.2f} {mid_y:.2f}"]
     cursor = x
-    direction = -1
     while cursor < x + width:
-        control_x = min(cursor + step / 2.0, x + width)
-        end_x = min(cursor + step, x + width)
-        control_y = mid_y + direction * (height / 2.5)
-        path.append(f"Q {control_x:.2f} {control_y:.2f} {end_x:.2f} {mid_y:.2f}")
-        cursor += step
-        direction *= -1
+        first_mid_x = min(cursor + loop_width * 0.42, x + width)
+        end_x = min(cursor + loop_width, x + width)
+        path.append(
+            " ".join(
+                [
+                    f"C {min(cursor + loop_width * 0.12, x + width):.2f} {mid_y - amplitude:.2f}",
+                    f"{min(cursor + loop_width * 0.28, x + width):.2f} {mid_y - amplitude:.2f}",
+                    f"{first_mid_x:.2f} {mid_y:.2f}",
+                    f"C {min(cursor + loop_width * 0.58, x + width):.2f} {mid_y + amplitude:.2f}",
+                    f"{min(cursor + loop_width * 0.78, x + width):.2f} {mid_y + amplitude:.2f}",
+                    f"{end_x:.2f} {mid_y:.2f}",
+                ]
+            )
+        )
+        cursor += loop_width
     return " ".join(path)
 
 

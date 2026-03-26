@@ -10,6 +10,7 @@ import pytest
 import openfoldpanel.pipeline as pipeline_module
 from openfoldpanel.cli import build_parser, main
 from openfoldpanel.constants import ALLOWED_EVALUES, DEFAULT_EVALUE
+from openfoldpanel.features.dssp_runner import DSSPResidueFeature
 from openfoldpanel.utils.text import summarize_msa_database_path
 from tests.conftest import write_test_mmcif, write_test_pdb
 
@@ -103,10 +104,16 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert 'data-legend-card="tracks"' in html_text
     assert 'data-legend-card="contacts"' in html_text
     assert 'data-legend-kind="strand"' in html_text
-    assert 'data-legend-kind="helix"' in html_text
+    assert 'data-legend-kind="alpha-helix"' in html_text
+    assert 'data-legend-kind="three-ten-helix"' in html_text
+    assert 'data-legend-kind="pi-helix"' in html_text
+    assert 'data-legend-kind="helix"' not in html_text
     assert 'data-legend-kind="alpha-turn"' in html_text
     assert 'data-legend-kind="beta-turn"' in html_text
     assert 'data-legend-kind="turn"' not in html_text
+    assert "Alpha Helix" in html_text
+    assert "3₁₀ Helix" in html_text
+    assert "Pi Helix" in html_text
     assert "Alpha Turn" in html_text
     assert "Beta Turn" in html_text
     assert 'data-legend-kind="accessibility-buried"' in html_text
@@ -132,6 +139,28 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "View Logs" not in html_text
     assert "Terminology" not in html_text
     assert "Research Collaboration Report" not in html_text
+
+
+def test_cli_tracks_json_uses_helix_subtype_categories(tmp_path, monkeypatch):
+    input_path = write_test_pdb(tmp_path / "single_model.pdb")
+    outdir = tmp_path / "out"
+
+    def fake_run_dssp(structure_path, logger):
+        return {
+            ("A", 1, ""): DSSPResidueFeature("A", 1, "", "A", "G", 42.0),
+            ("A", 2, ""): DSSPResidueFeature("A", 2, "", "G", "H", 42.0),
+            ("A", 3, ""): DSSPResidueFeature("A", 3, "", "S", "I", 42.0),
+        }, []
+
+    monkeypatch.setattr(pipeline_module, "run_dssp", fake_run_dssp)
+
+    exit_code = main(["--input", str(input_path), "--outdir", str(outdir), "--chain", "A"])
+    assert exit_code == 0
+
+    payload = json.loads((outdir / "single_model" / "tracks.json").read_text())
+    categories = [entry["category"] for entry in payload["chain_panels"][0]["models"][0]["secondary_structure"][:3]]
+    assert categories == ["three_ten_helix", "alpha_helix", "pi_helix"]
+    assert "helix" not in categories
 
 
 def test_cli_rejects_deprecated_auto_and_supports_specific_reference_chain_selection(tmp_path):

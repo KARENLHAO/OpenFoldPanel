@@ -246,12 +246,12 @@ def test_structure_annotations_render_only_once_for_top_secondary_track():
     ]
     hydropathy = compute_hydropathy(axis, window=3)
     secondary = [
-        SecondaryStructureEntry(0, "H", "helix"),
-        SecondaryStructureEntry(1, "H", "helix"),
-        SecondaryStructureEntry(2, "E", "strand"),
-        SecondaryStructureEntry(3, "E", "strand"),
-        SecondaryStructureEntry(4, "C", "coil"),
-        SecondaryStructureEntry(5, "E", "strand"),
+        SecondaryStructureEntry(0, "G", "three_ten_helix"),
+        SecondaryStructureEntry(1, "G", "three_ten_helix"),
+        SecondaryStructureEntry(2, "H", "alpha_helix"),
+        SecondaryStructureEntry(3, "H", "alpha_helix"),
+        SecondaryStructureEntry(4, "I", "pi_helix"),
+        SecondaryStructureEntry(5, "I", "pi_helix"),
         SecondaryStructureEntry(6, "E", "strand"),
         SecondaryStructureEntry(7, "C", "coil"),
     ]
@@ -280,10 +280,15 @@ def test_structure_annotations_render_only_once_for_top_secondary_track():
 
     svg, _ = render_panel_svg(panel)
 
+    assert 'class="three-ten-helix-track"' in svg
+    assert 'class="alpha-helix-track"' in svg
+    assert 'class="pi-helix-track"' in svg
+    assert 'class="helix-track"' not in svg
+    assert ">3₁₀1<" in svg
     assert svg.count(">α1<") == 1
+    assert svg.count(">π1<") == 1
     assert svg.count(">β1<") == 1
-    assert svg.count(">β2<") == 1
-    assert "η1" not in svg
+    assert "Helix" not in svg
 
 
 def test_confidence_track_renders_one_cell_per_residue():

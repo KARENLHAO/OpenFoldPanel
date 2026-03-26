@@ -48,7 +48,7 @@ __OFP_INLINE_STYLES__
         <g class="ofp-atmosphere__sequence">
           <text x="1050" y="120">GLY  ALA  ASN  SER  TYR  LEU  CYS  GLU</text>
           <text x="94" y="620">A T G C C A U G A A C C U G A C</text>
-          <text x="1066" y="948">beta-strand  helix  contact  pLDDT  accessibility</text>
+          <text x="1010" y="948">beta-strand  α / 3₁₀ / π helices  contact  pLDDT  accessibility</text>
         </g>
         <g class="ofp-atmosphere__guides">
           <line x1="86" y1="128" x2="510" y2="128" />
@@ -101,15 +101,37 @@ __OFP_INLINE_STYLES__
                     <section class="ofp-legend-group legend-group">
                       <h3 class="ofp-legend-group-title legend-group-title">Secondary Structure</h3>
                       <div class="ofp-legend-items legend-items">
-                        <div class="ofp-legend-item legend-item" data-legend-kind="helix">
+                        <div class="ofp-legend-item legend-item" data-legend-kind="alpha-helix">
                           <span class="ofp-legend-symbol">
                             <svg viewBox="0 0 60 20" aria-hidden="true">
-                              <path class="ofp-legend-helix" d="M 4 10 Q 10 3 16 10 Q 22 17 28 10 Q 34 3 40 10 Q 46 17 52 10" />
+                              <path class="ofp-legend-alpha-helix" d="M 4 10 C 5.2 5.6 7.0 5.6 9.8 10 C 12.6 14.4 14.4 14.4 17.2 10 C 20.0 5.6 21.8 5.6 24.6 10 C 27.4 14.4 29.2 14.4 32.0 10 C 34.8 5.6 36.6 5.6 39.4 10 C 42.2 14.4 44.0 14.4 46.8 10 C 49.6 5.6 51.4 5.6 54.2 10" />
                             </svg>
                           </span>
                           <span class="ofp-legend-copy">
-                            <strong>Helix</strong>
-                            <small>Alpha-helical secondary structure segment.</small>
+                            <strong>Alpha Helix</strong>
+                            <small>Canonical helix subtype associated with an i to i+4 backbone hydrogen bond.</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="three-ten-helix">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 60 20" aria-hidden="true">
+                              <path class="ofp-legend-three-ten-helix" d="M 4 10 C 5.2 5.6 7.0 5.6 9.8 10 C 12.6 14.4 14.4 14.4 17.2 10 C 20.0 5.6 21.8 5.6 24.6 10 C 27.4 14.4 29.2 14.4 32.0 10 C 34.8 5.6 36.6 5.6 39.4 10 C 42.2 14.4 44.0 14.4 46.8 10 C 49.6 5.6 51.4 5.6 54.2 10" />
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>3₁₀ Helix</strong>
+                            <small>Tighter helix subtype associated with an i to i+3 backbone hydrogen bond.</small>
+                          </span>
+                        </div>
+                        <div class="ofp-legend-item legend-item" data-legend-kind="pi-helix">
+                          <span class="ofp-legend-symbol">
+                            <svg viewBox="0 0 60 20" aria-hidden="true">
+                              <path class="ofp-legend-pi-helix" d="M 4 10 C 5.2 5.6 7.0 5.6 9.8 10 C 12.6 14.4 14.4 14.4 17.2 10 C 20.0 5.6 21.8 5.6 24.6 10 C 27.4 14.4 29.2 14.4 32.0 10 C 34.8 5.6 36.6 5.6 39.4 10 C 42.2 14.4 44.0 14.4 46.8 10 C 49.6 5.6 51.4 5.6 54.2 10" />
+                            </svg>
+                          </span>
+                          <span class="ofp-legend-copy">
+                            <strong>Pi Helix</strong>
+                            <small>Expanded helix subtype associated with an i to i+5 backbone hydrogen bond.</small>
                           </span>
                         </div>
                         <div class="ofp-legend-item legend-item" data-legend-kind="strand">

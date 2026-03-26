@@ -103,12 +103,26 @@
   line-height: 1.4;
 }
 
-.ofp-legend-helix {
+.ofp-legend-alpha-helix,
+.ofp-legend-three-ten-helix,
+.ofp-legend-pi-helix {
   fill: none;
-  stroke: var(--ofp-color-helix-fill);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.ofp-legend-alpha-helix {
+  stroke: var(--ofp-color-alpha-helix);
+}
+
+.ofp-legend-three-ten-helix {
+  stroke: var(--ofp-color-three-ten-helix);
+}
+
+.ofp-legend-pi-helix {
+  stroke: var(--ofp-color-pi-helix);
+  stroke-width: 1.8;
 }
 
 .ofp-legend-strand {

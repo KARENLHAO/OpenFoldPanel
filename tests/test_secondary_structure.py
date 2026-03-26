@@ -53,6 +53,97 @@ def _build_track(
     return [entry.category for entry in track]
 
 
+def _build_track_without_dssp(residues: list[ResidueRecord]) -> list[str]:
+    residue_by_axis_index = {index: residue for index, residue in enumerate(residues)}
+    track = build_secondary_structure_track(_axis(len(residues)), residue_by_axis_index, {})
+    return [entry.category for entry in track]
+
+
+def test_build_secondary_structure_track_maps_dssp_helix_codes_to_three_subtypes():
+    residues = [
+        _residue(1, {"N": (0.0, 0.0, 0.0), "CA": (1.0, 0.0, 0.0), "C": (2.0, 0.0, 0.0), "O": (3.0, 0.0, 0.0)}),
+        _residue(2, {"N": (4.0, 0.0, 0.0), "CA": (5.0, 0.0, 0.0), "C": (6.0, 0.0, 0.0), "O": (7.0, 0.0, 0.0)}),
+        _residue(3, {"N": (8.0, 0.0, 0.0), "CA": (9.0, 0.0, 0.0), "C": (10.0, 0.0, 0.0), "O": (11.0, 0.0, 0.0)}),
+    ]
+    residue_by_axis_index = {index: residue for index, residue in enumerate(residues)}
+    dssp_by_residue = {
+        ("A", 1, ""): _dssp_feature(residues[0], "G"),
+        ("A", 2, ""): _dssp_feature(residues[1], "H"),
+        ("A", 3, ""): _dssp_feature(residues[2], "I"),
+    }
+
+    track = build_secondary_structure_track(_axis(len(residues)), residue_by_axis_index, dssp_by_residue)
+
+    assert [entry.category for entry in track] == ["three_ten_helix", "alpha_helix", "pi_helix"]
+
+
+def test_build_secondary_structure_track_marks_three_ten_helix_from_backbone_geometry_without_dssp():
+    residues = [
+        _residue(1, {"N": (-1.0, 0.0, 0.0), "CA": (0.0, -1.0, 0.0), "C": (1.0, 0.0, 0.0), "O": (0.0, 0.0, 0.0)}),
+        _residue(2, {"N": (1.0, 1.0, 0.0), "CA": (1.9, 0.7, 0.0), "C": (2.9, 1.0, 0.0), "O": (3.5, 1.0, 0.0)}),
+        _residue(3, {"N": (3.0, 1.0, 0.0), "CA": (3.8, 0.2, 0.0), "C": (4.8, 1.0, 0.0), "O": (5.4, 1.0, 0.0)}),
+        _residue(4, {"N": (0.0, 2.9, 0.0), "CA": (4.8, -1.0, 0.0), "C": (5.8, 0.0, 0.0), "O": (6.4, 0.0, 0.0)}),
+    ]
+
+    assert _build_track_without_dssp(residues) == [
+        "three_ten_helix",
+        "three_ten_helix",
+        "three_ten_helix",
+        "three_ten_helix",
+    ]
+
+
+def test_build_secondary_structure_track_marks_pi_helix_from_backbone_geometry_without_dssp():
+    residues = [
+        _residue(1, {"N": (-1.0, 0.0, 0.0), "CA": (0.0, -1.0, 0.0), "C": (1.0, 0.0, 0.0), "O": (0.0, 0.0, 0.0)}),
+        _residue(2, {"N": (2.0, 1.0, 0.0), "CA": (2.4, -0.5, 0.0), "C": (3.0, 1.0, 0.0), "O": (3.6, 1.0, 0.0)}),
+        _residue(3, {"N": (4.0, 1.0, 0.0), "CA": (4.4, -0.4, 0.0), "C": (5.0, 1.0, 0.0), "O": (5.6, 1.0, 0.0)}),
+        _residue(4, {"N": (6.0, 1.0, 0.0), "CA": (6.4, -0.3, 0.0), "C": (7.0, 1.0, 0.0), "O": (7.6, 1.0, 0.0)}),
+        _residue(5, {"N": (8.0, 1.0, 0.0), "CA": (8.4, -0.2, 0.0), "C": (9.0, 1.0, 0.0), "O": (9.6, 1.0, 0.0)}),
+        _residue(6, {"N": (0.0, 3.0, 0.0), "CA": (10.6, -1.0, 0.0), "C": (11.6, 0.0, 0.0), "O": (12.2, 0.0, 0.0)}),
+    ]
+
+    assert _build_track_without_dssp(residues) == [
+        "pi_helix",
+        "pi_helix",
+        "pi_helix",
+        "pi_helix",
+        "pi_helix",
+        "pi_helix",
+    ]
+
+
+def test_build_secondary_structure_track_keeps_explicit_dssp_alpha_helix_when_geometry_could_suggest_other_subtypes():
+    residues = [
+        _residue(1, {"N": (-1.0, 0.0, 0.0), "CA": (0.0, -1.0, 0.0), "C": (1.0, 0.0, 0.0), "O": (0.0, 0.0, 0.0)}),
+        _residue(2, {"N": (2.0, 1.0, 0.0), "CA": (2.4, -0.5, 0.0), "C": (3.0, 1.0, 0.0), "O": (3.6, 1.0, 0.0)}),
+        _residue(3, {"N": (4.0, 1.0, 0.0), "CA": (4.4, -0.4, 0.0), "C": (5.0, 1.0, 0.0), "O": (5.6, 1.0, 0.0)}),
+        _residue(4, {"N": (6.0, 1.0, 0.0), "CA": (6.4, -0.3, 0.0), "C": (7.0, 1.0, 0.0), "O": (7.6, 1.0, 0.0)}),
+        _residue(5, {"N": (0.0, 3.0, 0.0), "CA": (8.4, -0.2, 0.0), "C": (9.0, 1.0, 0.0), "O": (9.6, 1.0, 0.0)}),
+        _residue(6, {"N": (0.0, 3.2, 0.0), "CA": (10.6, -1.0, 0.0), "C": (11.6, 0.0, 0.0), "O": (12.2, 0.0, 0.0)}),
+    ]
+
+    assert _build_track(residues, dssp_code="H") == ["alpha_helix"] * 6
+
+
+def test_build_secondary_structure_track_prefers_shorter_hydrogen_bond_distance_before_subtype_priority():
+    residues = [
+        _residue(1, {"N": (-1.0, 0.0, 0.0), "CA": (0.0, -1.0, 0.0), "C": (1.0, 0.0, 0.0), "O": (0.0, 0.0, 0.0)}),
+        _residue(2, {"N": (2.0, 1.0, 0.0), "CA": (2.4, -0.5, 0.0), "C": (3.0, 1.0, 0.0), "O": (3.6, 1.0, 0.0)}),
+        _residue(3, {"N": (4.0, 1.0, 0.0), "CA": (4.4, -0.4, 0.0), "C": (5.0, 1.0, 0.0), "O": (5.6, 1.0, 0.0)}),
+        _residue(4, {"N": (0.0, 3.4, 0.0), "CA": (6.4, -0.3, 0.0), "C": (7.0, 1.0, 0.0), "O": (7.6, 1.0, 0.0)}),
+        _residue(5, {"N": (0.0, 2.8, 0.0), "CA": (8.4, -0.2, 0.0), "C": (9.0, 1.0, 0.0), "O": (9.6, 1.0, 0.0)}),
+    ]
+
+    assert _build_track_without_dssp(residues) == [
+        "alpha_helix",
+        "alpha_helix",
+        "alpha_helix",
+        "alpha_helix",
+        "alpha_helix",
+    ]
+
+
 def test_build_secondary_structure_track_marks_beta_turn_from_strict_backbone_geometry():
     residues = [
         _residue(1, {"N": (-1.0, 0.0, 0.0), "CA": (0.0, -1.0, 0.0), "C": (1.0, 0.0, 0.0), "O": (0.0, 0.0, 0.0)}),

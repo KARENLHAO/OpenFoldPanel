@@ -75,6 +75,9 @@ def _style_block(config) -> str:
         f'.sequence-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
         f'.contact-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
         '.confidence-cell{shape-rendering:crispEdges;}'
+        f'.alpha-helix-track{{fill:none;stroke:{config.colors["alpha_helix"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
+        f'.three-ten-helix-track{{fill:none;stroke:{config.colors["three_ten_helix"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
+        f'.pi-helix-track{{fill:none;stroke:{config.colors["pi_helix"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
         f'.alpha-turn-track{{fill:none;stroke:{config.colors["alpha_turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
         f'.beta-turn-track{{fill:none;stroke:{config.colors["beta_turn_text"]};stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}}'
         f'.soft-rule{{stroke:{config.colors["grid"]};stroke-width:0.9;}}'
@@ -220,15 +223,25 @@ def _render_secondary_row(panel_data: JobPanelData, model_index: int | None, blo
     row_height = height * 0.62
     pieces = []
 
-    helix_segments = _segment_ranges(model.secondary_structure, block, "helix")
+    alpha_helix_segments = _segment_ranges(model.secondary_structure, block, "alpha_helix")
+    three_ten_helix_segments = _segment_ranges(model.secondary_structure, block, "three_ten_helix")
+    pi_helix_segments = _segment_ranges(model.secondary_structure, block, "pi_helix")
     strand_segments = _segment_ranges(model.secondary_structure, block, "strand")
     alpha_turn_segments = _segment_ranges(model.secondary_structure, block, "alpha_turn")
     beta_turn_segments = _segment_ranges(model.secondary_structure, block, "beta_turn")
 
-    for start, end in helix_segments:
+    for start, end in alpha_helix_segments:
         x = grid_x + (start - block.start) * config.cell_width
         width = (end - start) * config.cell_width
-        pieces.append(f'<path d="{helix_path(x, row_y, width, row_height)}" fill="none" stroke="{config.colors["helix_fill"]}" stroke-width="1.9"/>')
+        pieces.append(f'<path class="alpha-helix-track" d="{helix_path(x, row_y, width, row_height)}"/>')
+    for start, end in three_ten_helix_segments:
+        x = grid_x + (start - block.start) * config.cell_width
+        width = (end - start) * config.cell_width
+        pieces.append(f'<path class="three-ten-helix-track" d="{helix_path(x, row_y, width, row_height)}"/>')
+    for start, end in pi_helix_segments:
+        x = grid_x + (start - block.start) * config.cell_width
+        width = (end - start) * config.cell_width
+        pieces.append(f'<path class="pi-helix-track" d="{helix_path(x, row_y, width, row_height)}"/>')
     for start, end in strand_segments:
         x = grid_x + (start - block.start) * config.cell_width
         width = (end - start) * config.cell_width
@@ -418,18 +431,23 @@ def _disulfide_color(scope: str, colors: dict[str, str]) -> str:
 
 def _secondary_annotations(track: list[SecondaryStructureEntry]) -> list[StructureAnnotation]:
     annotations: list[StructureAnnotation] = []
-    counters = {"strand": 0, "helix": 0}
+    counters = {"strand": 0, "alpha_helix": 0, "three_ten_helix": 0, "pi_helix": 0}
     index = 0
     while index < len(track):
         category = track[index].category
-        if category not in {"strand", "helix"}:
+        if category not in {"strand", "alpha_helix", "three_ten_helix", "pi_helix"}:
             index += 1
             continue
         end = index + 1
         while end < len(track) and track[end].category == category:
             end += 1
         counters[category] += 1
-        symbol = {"strand": "β", "helix": "α"}[category]
+        symbol = {
+            "strand": "β",
+            "alpha_helix": "α",
+            "three_ten_helix": "3₁₀",
+            "pi_helix": "π",
+        }[category]
         annotations.append(StructureAnnotation(category=category, start=index, end=end, label=f"{symbol}{counters[category]}"))
         index = end
     return annotations
@@ -438,8 +456,12 @@ def _secondary_annotations(track: list[SecondaryStructureEntry]) -> list[Structu
 def _structure_color(category: str, colors: dict[str, str]) -> str:
     if category == "strand":
         return colors["strand_fill"]
-    if category == "helix":
-        return colors["helix_fill"]
+    if category == "alpha_helix":
+        return colors["alpha_helix"]
+    if category == "three_ten_helix":
+        return colors["three_ten_helix"]
+    if category == "pi_helix":
+        return colors["pi_helix"]
     if category == "alpha_turn":
         return colors["alpha_turn_text"]
     return colors["beta_turn_text"]

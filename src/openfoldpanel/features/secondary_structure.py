@@ -11,6 +11,16 @@ ALPHA_TURN_CA_DISTANCE_MAX = 6.5
 BETA_TURN_CA_DISTANCE_MAX = 7.0
 BACKBONE_HBOND_DISTANCE_MAX = 3.5
 BACKBONE_HBOND_ANGLE_MIN = 90.0
+HELIX_SUBTYPE_PRIORITY = {
+    "pi_helix": 0,
+    "alpha_helix": 1,
+    "three_ten_helix": 2,
+}
+HELIX_WINDOW_DEFINITIONS = (
+    ("three_ten_helix", 4, 3),
+    ("alpha_helix", 5, 4),
+    ("pi_helix", 6, 5),
+)
 
 
 def normalize_dssp_code(code: str | None) -> str:
@@ -19,8 +29,12 @@ def normalize_dssp_code(code: str | None) -> str:
     if code is None:
         return "missing"
     upper = code.upper()
-    if upper in {"H", "G", "I"}:
-        return "helix"
+    if upper == "H":
+        return "alpha_helix"
+    if upper == "G":
+        return "three_ten_helix"
+    if upper == "I":
+        return "pi_helix"
     if upper in {"E", "B"}:
         return "strand"
     return "coil"
@@ -34,6 +48,8 @@ def build_secondary_structure_track(
     """Build a secondary-structure track aligned to the reference axis."""
 
     track: list[SecondaryStructureEntry] = []
+    explicit_dssp_positions: set[int] = set()
+    explicit_dssp_helix_positions: set[int] = set()
     for position in axis:
         residue = residue_by_axis_index.get(position.residue_index)
         feature = None
@@ -45,16 +61,73 @@ def build_secondary_structure_track(
                     residue.residue_id.insertion_code,
                 )
             )
-        dssp_code = feature.dssp_code if feature else _approximate_secondary_code(position.residue_index, residue_by_axis_index)
+        if feature:
+            dssp_code = feature.dssp_code
+            category = normalize_dssp_code(dssp_code)
+            explicit_dssp_positions.add(position.residue_index)
+            if dssp_code and dssp_code.upper() in {"G", "H", "I"}:
+                explicit_dssp_helix_positions.add(position.residue_index)
+        else:
+            dssp_code = _approximate_secondary_code(position.residue_index, residue_by_axis_index)
+            category = _approximate_secondary_category(dssp_code)
         track.append(
             SecondaryStructureEntry(
                 residue_index=position.residue_index,
                 dssp_code=dssp_code,
-                category=normalize_dssp_code(dssp_code),
+                category=category,
             )
         )
+    _assign_helix_subtypes(track, residue_by_axis_index, explicit_dssp_positions, explicit_dssp_helix_positions)
     _assign_turn_subtypes(track, residue_by_axis_index)
+    _finalize_helix_candidates(track)
     return track
+
+
+def _approximate_secondary_category(code: str | None) -> str:
+    if code == "H":
+        return "helix_candidate"
+    return normalize_dssp_code(code)
+
+
+def _assign_helix_subtypes(
+    track: list[SecondaryStructureEntry],
+    residue_by_axis_index: dict[int, ResidueRecord],
+    explicit_dssp_positions: set[int],
+    explicit_dssp_helix_positions: set[int],
+) -> None:
+    """Refine helix-like residues into 3_10, alpha, or pi helix subtypes."""
+
+    candidates: list[tuple[float, int, int, int, str]] = []
+    for start in range(len(track)):
+        for subtype, length, offset in HELIX_WINDOW_DEFINITIONS:
+            distance = _qualifies_helix_window(
+                track,
+                residue_by_axis_index,
+                explicit_dssp_positions,
+                explicit_dssp_helix_positions,
+                start=start,
+                length=length,
+                hbond_offset=offset,
+            )
+            if distance is None:
+                continue
+            candidates.append((distance, HELIX_SUBTYPE_PRIORITY[subtype], start, length, subtype))
+
+    for residue_index in range(len(track)):
+        entry = track[residue_index]
+        if entry.category not in {"coil", "helix_candidate"}:
+            continue
+        if entry.residue_index in explicit_dssp_positions:
+            continue
+        covering = [
+            candidate
+            for candidate in candidates
+            if candidate[2] <= residue_index < candidate[2] + candidate[3]
+        ]
+        if not covering:
+            continue
+        _, _, _, _, subtype = min(covering, key=lambda candidate: (candidate[0], candidate[1], candidate[2]))
+        entry.category = subtype
 
 
 def _assign_turn_subtypes(
@@ -87,7 +160,7 @@ def _qualifies_turn_window(
     window = track[start : start + length]
     if len(window) != length:
         return False
-    if any(entry.category != "coil" for entry in window):
+    if any(entry.category not in {"coil", "helix_candidate"} for entry in window):
         return False
     residues: list[ResidueRecord] = []
     for entry in window:
@@ -116,6 +189,69 @@ def _qualifies_turn_window(
     if _angle(start_o, end_n, end_ca) < BACKBONE_HBOND_ANGLE_MIN:
         return False
     return True
+
+
+def _qualifies_helix_window(
+    track: list[SecondaryStructureEntry],
+    residue_by_axis_index: dict[int, ResidueRecord],
+    explicit_dssp_positions: set[int],
+    explicit_dssp_helix_positions: set[int],
+    *,
+    start: int,
+    length: int,
+    hbond_offset: int,
+) -> float | None:
+    window = track[start : start + length]
+    if len(window) != length:
+        return None
+    if any(
+        entry.residue_index in explicit_dssp_positions and entry.residue_index not in explicit_dssp_helix_positions
+        for entry in window
+    ):
+        return None
+    if any(entry.residue_index in explicit_dssp_helix_positions for entry in window):
+        explicit_subtypes = {entry.category for entry in window if entry.residue_index in explicit_dssp_helix_positions}
+        if len(explicit_subtypes) != 1:
+            return None
+        if subtype_for_offset(hbond_offset) not in explicit_subtypes:
+            return None
+    if any(entry.category in {"strand", "alpha_turn", "beta_turn", "missing"} for entry in window):
+        return None
+
+    residues: list[ResidueRecord] = []
+    for entry in window:
+        residue = residue_by_axis_index.get(entry.residue_index)
+        if residue is None:
+            return None
+        if _atom_by_name(residue, "CA") is None:
+            return None
+        residues.append(residue)
+
+    start_residue = residues[0]
+    end_residue = residues[hbond_offset]
+    start_o = _atom_by_name(start_residue, "O")
+    end_n = _atom_by_name(end_residue, "N")
+    if start_o is None or end_n is None:
+        return None
+
+    distance = _distance(start_o, end_n)
+    if distance > BACKBONE_HBOND_DISTANCE_MAX:
+        return None
+    return distance
+
+
+def subtype_for_offset(hbond_offset: int) -> str:
+    return {
+        3: "three_ten_helix",
+        4: "alpha_helix",
+        5: "pi_helix",
+    }[hbond_offset]
+
+
+def _finalize_helix_candidates(track: list[SecondaryStructureEntry]) -> None:
+    for entry in track:
+        if entry.category == "helix_candidate":
+            entry.category = "alpha_helix"
 
 
 def _atom_by_name(residue: ResidueRecord, atom_name: str) -> AtomRecord | None:
