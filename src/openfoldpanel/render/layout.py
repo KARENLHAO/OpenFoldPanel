@@ -78,6 +78,11 @@ def build_rows(panel_data: JobPanelData) -> list[LayoutRow]:
     rows: list[LayoutRow] = []
     for index, model in enumerate(panel_data.models):
         rows.append(LayoutRow(kind="secondary", label=model.name, model_index=index))
+
+    if panel_data.antibody_numberings:
+        rows.append(LayoutRow(kind="antibody_numbering", label="Antibody Numbering"))
+
+    for index, _model in enumerate(panel_data.models):
         rows.append(LayoutRow(kind="confidence", label="Confidence", model_index=index))
 
     query_index = next((index for index, row in enumerate(panel_data.msa.rows) if row.is_query), 0)
@@ -188,7 +193,7 @@ def _estimate_label_width(rows: list[LayoutRow], config: RenderConfig) -> float:
 
 
 def _row_group(kind: str) -> str:
-    if kind in {"secondary", "confidence"}:
+    if kind in {"secondary", "confidence", "antibody_numbering"}:
         return "secondary"
     if kind.startswith("msa_"):
         return "msa"
@@ -200,6 +205,8 @@ def _row_group(kind: str) -> str:
 def _row_height(kind: str, config: RenderConfig) -> float:
     if kind == "secondary":
         return round(config.font_size * 1.52, 2)
+    if kind == "antibody_numbering":
+        return round(max(config.font_size * 1.62, 18.0), 2)
     if kind == "confidence":
         return round(max(config.font_size * 0.82, 8.4), 2)
     if kind.startswith("msa_"):

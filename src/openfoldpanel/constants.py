@@ -26,6 +26,8 @@ DEFAULT_EVALUE = "1e-6"  # BLAST hit significance threshold
 MAX_HOMOLOGS_DISPLAYED_LIMIT = 25
 DEFAULT_CONTACT_CUTOFF = 3.7
 DEFAULT_STRONG_CONTACT_CUTOFF = 3.2
+DEFAULT_TM_CLUSTER_CUTOFF = 0.7
+SUPPORTED_ANTIBODY_NUMBERING = ("kabat", "imgt", "chothia")
 
 ALLOWED_EVALUES = ["1e-4", "1e-5", "1e-6", "1e-7", "1e-8", "1e-9", "1e-10", "1e-11", "1e-12"]
 
@@ -39,7 +41,6 @@ def validate_evalue(value: str, *, parameter_name: str = "evalue") -> str:
     return value
 
 DEFAULT_CELL_WIDTH_RATIO = 0.68
-DEFAULT_ROW_HEIGHT_RATIO = 1.6
 DEFAULT_LABEL_COLUMNS = 18
 DEFAULT_MARGIN = 18
 DEFAULT_BLOCK_GAP = 24

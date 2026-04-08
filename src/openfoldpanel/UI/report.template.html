@@ -73,10 +73,16 @@ __OFP_INLINE_STYLES__
           </section>
         </div>
 
-        <label class="ofp-chain-control chain-control">
-          <span class="ofp-chain-label chain-label">Reference Chain</span>
-          <select class="ofp-chain-select chain-select" data-chain-select aria-label="Reference chain selector"></select>
-        </label>
+        <div class="ofp-toolbar-controls toolbar-controls">
+          <label class="ofp-chain-control chain-control">
+            <span class="ofp-chain-label chain-label">Reference Chain</span>
+            <select class="ofp-chain-select chain-select" data-chain-select aria-label="Reference chain selector"></select>
+          </label>
+          <label class="ofp-chain-control chain-control" data-antibody-scheme-control hidden>
+            <span class="ofp-chain-label chain-label">Antibody Scheme</span>
+            <select class="ofp-chain-select chain-select" data-antibody-scheme-select aria-label="Antibody numbering scheme selector"></select>
+          </label>
+        </div>
       </section>
 
       <section class="ofp-chain-stage chain-stack" aria-label="Reference Chain Panel">
@@ -165,6 +171,16 @@ __OFP_INLINE_STYLES__
                           <span class="ofp-legend-copy">
                             <strong>Beta Turn</strong>
                             <small>Four-residue tight turn associated with an i to i+3 backbone hydrogen bond.</small>
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                    <section class="ofp-legend-group legend-group" data-antibody-legend __OFP_ANTIBODY_LEGEND_HIDDEN__>
+                      <div class="ofp-legend-items legend-items">
+                        <div class="ofp-legend-item legend-item ofp-legend-item--text-only" data-legend-kind="antibody-numbering">
+                          <span class="ofp-legend-copy">
+                            <strong>Antibody Numbering</strong>
+                            <small>Shows CDR / framework region labels using the currently selected antibody numbering scheme.</small>
                           </span>
                         </div>
                       </div>

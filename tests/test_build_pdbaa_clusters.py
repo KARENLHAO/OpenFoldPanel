@@ -36,14 +36,6 @@ def write_cluster_file(path: Path, tokens: list[str]) -> None:
     path.write_text("\n".join(tokens) + "\n", encoding="utf-8")
 
 
-def write_pdb_seqres(path: Path, records: list[tuple[str, str]]) -> None:
-    chunks: list[str] = []
-    for header, sequence in records:
-        chunks.append(f">{header}")
-        chunks.append(sequence)
-    path.write_text("\n".join(chunks) + "\n", encoding="utf-8")
-
-
 @pytest.fixture
 def module(tmp_path, monkeypatch):
     module = load_build_pdbaa_clusters_module()
@@ -75,53 +67,35 @@ def test_iter_representative_entities_keeps_only_pdb_tokens_and_warns(tmp_path, 
     assert "NOT_A_VALID_TOKEN" in stderr
 
 
-def test_load_pdb_seqres_index_keeps_only_protein_sequences_with_uppercase_entry_ids(tmp_path, module):
-    seqres_path = tmp_path / "pdb_seqres.txt"
-    write_pdb_seqres(
-        seqres_path,
-        [
-            ("100d_A mol:na length:10 DNA", "CCGGCGCCGG"),
-            ("5b8c_A mol:protein length:119 Pembrolizumab light chain variable region", "DIQMTQSPSS"),
-            ("5b8c_D mol:protein length:119 Pembrolizumab light chain variable region", "TTTMTQSPSS"),
-            ("1qfw_B mol:protein length:120 Example heavy chain", "EVQLVESGGG"),
-        ],
-    )
-
-    seq_index = module.load_pdb_protein_chain_sequences(seqres_path)
-
-    assert seq_index == {
-        ("5B8C", "A"): "DIQMTQSPSS",
-        ("5B8C", "D"): "TTTMTQSPSS",
-        ("1QFW", "B"): "EVQLVESGGG",
+def test_extract_polymer_entity_sequence_prefers_canonical_sequence_and_cleans_whitespace(module):
+    payload = {
+        "entity_poly": {
+            "pdbx_seq_one_letter_code_can": "AAA\nBBB CCC",
+            "pdbx_seq_one_letter_code": "SHOULD_NOT_USE",
+        },
+        "rcsb_polymer_entity": {
+            "pdbx_description": "Example polymer entity",
+        },
     }
 
+    sequence = module.extract_polymer_entity_sequence(payload)
 
-def test_build_identity_fasta_uses_cached_or_fetched_chain_mapping_and_local_seqres_sequences(
-    tmp_path, module, monkeypatch
-):
+    assert sequence == "AAABBBCCC"
+
+
+def test_build_identity_fasta_uses_cached_or_fetched_entity_sequences(tmp_path, module, monkeypatch):
     cluster_dir = tmp_path / "pdb_cluster_src"
     cluster_dir.mkdir()
     write_cluster_file(cluster_dir / "clusters-by-entity-95.txt", ["5B8C_2 5DK3_2", "1QFW_3"])
-    write_pdb_seqres(
-        cluster_dir / "pdb_seqres.txt",
-        [
-            ("5b8c_A mol:protein length:119 Pembrolizumab light chain variable region", "AAAAAA"),
-            ("5b8c_D mol:protein length:119 Pembrolizumab light chain variable region", "DDDDDD"),
-            ("1qfw_B mol:protein length:120 Example heavy chain", "BBBBBB"),
-            ("100d_A mol:na length:10 DNA", "CCGGCGCCGG"),
-        ],
-    )
 
     payloads = {
         "https://data.rcsb.org/rest/v1/core/polymer_entity/5B8C/2": {
-            "rcsb_polymer_entity_container_identifiers": {
-                "auth_asym_ids": ["A", "D", "G", "J"],
-            }
+            "entity_poly": {"pdbx_seq_one_letter_code_can": "AAAAAA"},
+            "rcsb_polymer_entity": {"pdbx_description": "Light chain variable region"},
         },
         "https://data.rcsb.org/rest/v1/core/polymer_entity/1QFW/3": {
-            "rcsb_polymer_entity_container_identifiers": {
-                "auth_asym_ids": ["B"],
-            }
+            "entity_poly": {"pdbx_seq_one_letter_code": "BBBBBB"},
+            "rcsb_polymer_entity": {"pdbx_description": "Heavy chain variable region"},
         },
     }
     seen_urls: list[str] = []
@@ -137,35 +111,42 @@ def test_build_identity_fasta_uses_cached_or_fetched_chain_mapping_and_local_seq
     assert fasta_path == module.BUILD_DIR / "pdbaa95" / "pdbaa95.fasta"
     assert blast_prefix == module.BUILD_DIR / "pdbaa95" / "pdbaa95"
     assert fasta_path.read_text(encoding="utf-8") == (
-        ">pdb|5B8C|A\nAAAAAA\n"
-        ">pdb|1QFW|B\nBBBBBB\n"
+        ">pdb|5B8C|2\nAAAAAA\n"
+        ">pdb|1QFW|3\nBBBBBB\n"
     )
     assert seen_urls == [
         "https://data.rcsb.org/rest/v1/core/polymer_entity/5B8C/2",
         "https://data.rcsb.org/rest/v1/core/polymer_entity/1QFW/3",
     ]
 
-    cache_path = module.BUILD_DIR / "pdbaa_cache" / "entity_chain_map.json"
+    cache_path = module.BUILD_DIR / "pdbaa_cache" / "polymer_entity_map.json"
     assert json.loads(cache_path.read_text(encoding="utf-8")) == {
-        "5B8C_2": {"entry_id": "5B8C", "entity_id": "2", "chain_id": "A"},
-        "1QFW_3": {"entry_id": "1QFW", "entity_id": "3", "chain_id": "B"},
+        "5B8C_2": {
+            "description": "Light chain variable region",
+            "entity_id": "2",
+            "entry_id": "5B8C",
+            "header": "pdb|5B8C|2",
+            "sequence": "AAAAAA",
+        },
+        "1QFW_3": {
+            "description": "Heavy chain variable region",
+            "entity_id": "3",
+            "entry_id": "1QFW",
+            "header": "pdb|1QFW|3",
+            "sequence": "BBBBBB",
+        },
     }
 
     monkeypatch.setattr(module, "urlopen", lambda *_args, **_kwargs: pytest.fail("urlopen should not be called"))
-
     cached_fasta_path, _cached_blast_prefix = module.build_identity_fasta(95, cluster_dir, sleep_seconds=0, force=True)
 
     assert cached_fasta_path.read_text(encoding="utf-8") == fasta_path.read_text(encoding="utf-8")
 
 
-def test_build_identity_fasta_fails_when_chain_mapping_cannot_be_fetched(tmp_path, module, monkeypatch):
+def test_build_identity_fasta_fails_when_entity_payload_cannot_be_fetched(tmp_path, module, monkeypatch):
     cluster_dir = tmp_path / "pdb_cluster_src"
     cluster_dir.mkdir()
     write_cluster_file(cluster_dir / "clusters-by-entity-50.txt", ["5B8C_2"])
-    write_pdb_seqres(
-        cluster_dir / "pdb_seqres.txt",
-        [("5b8c_A mol:protein length:119 Pembrolizumab light chain variable region", "AAAAAA")],
-    )
 
     def fake_urlopen(_request, timeout=30):
         raise module.URLError("network down")
@@ -178,25 +159,46 @@ def test_build_identity_fasta_fails_when_chain_mapping_cannot_be_fetched(tmp_pat
     assert not (module.BUILD_DIR / "pdbaa50" / "pdbaa50.fasta").exists()
 
 
-def test_build_identity_fasta_skips_mapped_chain_without_local_protein_sequence(tmp_path, module, monkeypatch, capsys):
+def test_build_identity_fasta_retries_transient_timeout_and_succeeds(tmp_path, module, monkeypatch):
+    cluster_dir = tmp_path / "pdb_cluster_src"
+    cluster_dir.mkdir()
+    write_cluster_file(cluster_dir / "clusters-by-entity-50.txt", ["2J28_5"])
+
+    attempts = 0
+
+    def fake_urlopen(_request, timeout=30):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise module.URLError("timed out")
+        return FakeUrlopenResponse(
+            {
+                "entity_poly": {"pdbx_seq_one_letter_code_can": "AAAAAA"},
+                "rcsb_polymer_entity": {"pdbx_description": "Recovered after retry"},
+            }
+        )
+
+    monkeypatch.setattr(module, "urlopen", fake_urlopen)
+
+    fasta_path, _blast_prefix = module.build_identity_fasta(50, cluster_dir, sleep_seconds=0, force=False)
+
+    assert attempts == 2
+    assert fasta_path.read_text(encoding="utf-8") == ">pdb|2J28|5\nAAAAAA\n"
+
+
+def test_build_identity_fasta_skips_representative_without_entity_sequence(tmp_path, module, monkeypatch, capsys):
     cluster_dir = tmp_path / "pdb_cluster_src"
     cluster_dir.mkdir()
     write_cluster_file(cluster_dir / "clusters-by-entity-70.txt", ["5B8C_2", "1QFW_3"])
-    write_pdb_seqres(
-        cluster_dir / "pdb_seqres.txt",
-        [("1qfw_B mol:protein length:120 Example heavy chain", "BBBBBB")],
-    )
 
     payloads = {
         "https://data.rcsb.org/rest/v1/core/polymer_entity/5B8C/2": {
-            "rcsb_polymer_entity_container_identifiers": {
-                "auth_asym_ids": ["A", "D"],
-            }
+            "entity_poly": {"pdbx_seq_one_letter_code_can": ""},
+            "rcsb_polymer_entity": {"pdbx_description": "Missing sequence entity"},
         },
         "https://data.rcsb.org/rest/v1/core/polymer_entity/1QFW/3": {
-            "rcsb_polymer_entity_container_identifiers": {
-                "auth_asym_ids": ["B"],
-            }
+            "entity_poly": {"pdbx_seq_one_letter_code_can": "BBBBBB"},
+            "rcsb_polymer_entity": {"pdbx_description": "Heavy chain variable region"},
         },
     }
 
@@ -207,7 +209,7 @@ def test_build_identity_fasta_skips_mapped_chain_without_local_protein_sequence(
 
     fasta_path, _blast_prefix = module.build_identity_fasta(70, cluster_dir, sleep_seconds=0, force=False)
 
-    assert fasta_path.read_text(encoding="utf-8") == ">pdb|1QFW|B\nBBBBBB\n"
+    assert fasta_path.read_text(encoding="utf-8") == ">pdb|1QFW|3\nBBBBBB\n"
     assert "5B8C_2" in capsys.readouterr().err
 
 
@@ -217,26 +219,21 @@ def test_build_identity_fasta_resumes_from_existing_temp_without_rewriting_compl
     cluster_dir = tmp_path / "pdb_cluster_src"
     cluster_dir.mkdir()
     write_cluster_file(cluster_dir / "clusters-by-entity-50.txt", ["5B8C_2", "1QFW_3", "2ABC_1"])
-    write_pdb_seqres(
-        cluster_dir / "pdb_seqres.txt",
-        [
-            ("5b8c_A mol:protein length:119 Pembrolizumab light chain variable region", "AAAAAA"),
-            ("1qfw_B mol:protein length:120 Example heavy chain", "BBBBBB"),
-            ("2abc_C mol:protein length:88 Example protein", "CCCCCC"),
-        ],
-    )
 
     first_pass_payloads = {
         "https://data.rcsb.org/rest/v1/core/polymer_entity/5B8C/2": {
-            "rcsb_polymer_entity_container_identifiers": {"auth_asym_ids": ["A"]}
+            "entity_poly": {"pdbx_seq_one_letter_code_can": "AAAAAA"},
+            "rcsb_polymer_entity": {"pdbx_description": "Entity 5B8C_2"},
         },
         "https://data.rcsb.org/rest/v1/core/polymer_entity/1QFW/3": {
-            "rcsb_polymer_entity_container_identifiers": {"auth_asym_ids": ["B"]}
+            "entity_poly": {"pdbx_seq_one_letter_code_can": "BBBBBB"},
+            "rcsb_polymer_entity": {"pdbx_description": "Entity 1QFW_3"},
         },
     }
     second_pass_payloads = {
         "https://data.rcsb.org/rest/v1/core/polymer_entity/2ABC/1": {
-            "rcsb_polymer_entity_container_identifiers": {"auth_asym_ids": ["C"]}
+            "entity_poly": {"pdbx_seq_one_letter_code_can": "CCCCCC"},
+            "rcsb_polymer_entity": {"pdbx_description": "Entity 2ABC_1"},
         }
     }
     first_pass_seen: list[str] = []
@@ -256,8 +253,8 @@ def test_build_identity_fasta_resumes_from_existing_temp_without_rewriting_compl
 
     temp_path = module.BUILD_DIR / "pdbaa50" / "pdbaa50.fasta.tmp"
     assert temp_path.read_text(encoding="utf-8") == (
-        ">pdb|5B8C|A\nAAAAAA\n"
-        ">pdb|1QFW|B\nBBBBBB\n"
+        ">pdb|5B8C|2\nAAAAAA\n"
+        ">pdb|1QFW|3\nBBBBBB\n"
     )
     assert first_pass_seen == [
         "https://data.rcsb.org/rest/v1/core/polymer_entity/5B8C/2",
@@ -277,9 +274,9 @@ def test_build_identity_fasta_resumes_from_existing_temp_without_rewriting_compl
     fasta_path, _blast_prefix = module.build_identity_fasta(50, cluster_dir, sleep_seconds=0, force=False)
 
     assert fasta_path.read_text(encoding="utf-8") == (
-        ">pdb|5B8C|A\nAAAAAA\n"
-        ">pdb|1QFW|B\nBBBBBB\n"
-        ">pdb|2ABC|C\nCCCCCC\n"
+        ">pdb|5B8C|2\nAAAAAA\n"
+        ">pdb|1QFW|3\nBBBBBB\n"
+        ">pdb|2ABC|1\nCCCCCC\n"
     )
     assert second_pass_seen == [
         "https://data.rcsb.org/rest/v1/core/polymer_entity/2ABC/1",
@@ -287,18 +284,41 @@ def test_build_identity_fasta_resumes_from_existing_temp_without_rewriting_compl
     assert not temp_path.exists()
 
 
-def test_build_identity_fasta_requires_pdb_seqres_file(tmp_path, module):
+def test_build_identity_fasta_no_longer_requires_pdb_seqres_file(tmp_path, module, monkeypatch):
     cluster_dir = tmp_path / "pdb_cluster_src"
     cluster_dir.mkdir()
     write_cluster_file(cluster_dir / "clusters-by-entity-90.txt", ["5B8C_2"])
 
+    def fake_urlopen(_request, timeout=30):
+        return FakeUrlopenResponse(
+            {
+                "entity_poly": {"pdbx_seq_one_letter_code_can": "AAAAAA"},
+                "rcsb_polymer_entity": {"pdbx_description": "Entity 5B8C_2"},
+            }
+        )
+
+    monkeypatch.setattr(module, "urlopen", fake_urlopen)
+
+    fasta_path, _blast_prefix = module.build_identity_fasta(90, cluster_dir, sleep_seconds=0, force=False)
+
+    assert fasta_path.read_text(encoding="utf-8") == ">pdb|5B8C|2\nAAAAAA\n"
+
+
+def test_build_identity_fasta_rejects_existing_chain_level_fasta_without_force(tmp_path, module):
+    cluster_dir = tmp_path / "pdb_cluster_src"
+    cluster_dir.mkdir()
+    write_cluster_file(cluster_dir / "clusters-by-entity-95.txt", ["5B8C_2"])
+    fasta_path = module.BUILD_DIR / "pdbaa95" / "pdbaa95.fasta"
+    fasta_path.parent.mkdir(parents=True, exist_ok=True)
+    fasta_path.write_text(">pdb|5B8C|A\nAAAAAA\n", encoding="utf-8")
+
     with pytest.raises(SystemExit):
-        module.build_identity_fasta(90, cluster_dir, sleep_seconds=0, force=False)
+        module.build_identity_fasta(95, cluster_dir, sleep_seconds=0, force=False, reuse_existing_fasta=True)
 
 
 def test_build_blast_database_reuses_existing_script_contract(tmp_path, module, monkeypatch):
     fasta_path = tmp_path / "pdbaa95.fasta"
-    fasta_path.write_text(">pdb|5B8C|A\nAAAAAA\n", encoding="utf-8")
+    fasta_path.write_text(">pdb|5B8C|2\nAAAAAA\n", encoding="utf-8")
     blast_prefix = tmp_path / "pdbaa95"
 
     recorded: dict[str, object] = {}

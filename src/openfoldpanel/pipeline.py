@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from inspect import signature
 import logging
 import tempfile
 from collections.abc import Iterable
@@ -13,6 +12,8 @@ from openfoldpanel.extractors.archive import extract_archive
 from openfoldpanel.extractors.discovery import discover_jobs_from_extracted_root, discover_jobs_from_structure
 from openfoldpanel.extractors.validators import is_supported_archive, validate_input_path
 from openfoldpanel.features.accessibility import build_accessibility_track
+from openfoldpanel.features.antibody_annotation import annotate_antibody_chain
+from openfoldpanel.features.batch_analysis import build_batch_analysis
 from openfoldpanel.features.conservation import compute_conservation
 from openfoldpanel.features.contacts import compute_contacts
 from openfoldpanel.features.disulfide import infer_disulfides
@@ -21,6 +22,7 @@ from openfoldpanel.features.hydropathy import compute_hydropathy
 from openfoldpanel.features.msa_align import align_sequences
 from openfoldpanel.features.msa_search import search_homologs
 from openfoldpanel.features.secondary_structure import build_secondary_structure_track
+from openfoldpanel.io.csv_stats import write_statistics_csvs
 from openfoldpanel.io.json_dump import write_tracks_json
 from openfoldpanel.io.writers import write_summary
 from openfoldpanel.logging_utils import attach_file_logger, detach_handler
@@ -44,7 +46,6 @@ from openfoldpanel.parsers.structure_parser import (
     collect_reference_chains,
     get_chain_or_best_match,
     parse_structure,
-    select_reference_chain,
 )
 from openfoldpanel.render.layout import build_render_config
 from openfoldpanel.render.pdf_export import export_pdf
@@ -185,8 +186,8 @@ def _run_job(
             len(job.structure_files),
         )
         reference_structure = parsed_structures[0]
-        default_reference_chain = select_reference_chain(reference_structure, "AUTO")
         requested_reference_chains = collect_reference_chains(reference_structure, config.chain)
+        preferred_default_reference_chain = _preferred_default_reference_chain(requested_reference_chains)
         render_config = build_render_config(config.columns, config.font_size, config.max_homologs_displayed)
         logger.info(
             "[Job %s/%s] Rendering reference chains: %s",
@@ -221,7 +222,7 @@ def _run_job(
                 None,
             )
 
-        default_reference_chain = _resolve_default_reference_chain(default_reference_chain, chain_panels)
+        default_reference_chain = _resolve_default_reference_chain(preferred_default_reference_chain, chain_panels)
 
         report_data = JobReportData(
             job_name=job.name,
@@ -230,6 +231,17 @@ def _run_job(
             warnings=issues.warnings,
             status="success",
         )
+
+        batch_result = build_batch_analysis(
+            report_data,
+            parsed_structures,
+            tm_cluster_cutoff=config.tm_cluster_cutoff,
+            disable_tm_clustering=config.disable_tm_clustering,
+            logger=logger,
+        )
+        report_data.batch_analysis = batch_result.analysis
+        issues.extend_warnings(batch_result.warnings)
+        issues.extend_partials(batch_result.partial_reasons)
 
         artifacts = _export_reference_chain_pdfs(
             report_data,
@@ -284,9 +296,9 @@ def _run_job(
 def _write_job_result(
     output_dir: Path,
     result: JobRunResult,
-    panel_data: JobPanelData | JobReportData | None,
+    report_data: JobReportData | None,
 ) -> JobRunResult:
-    write_summary(result, panel_data, output_dir / "summary.txt")
+    write_summary(result, report_data, output_dir / "summary.txt")
     return result
 
 
@@ -398,6 +410,14 @@ def _resolve_default_reference_chain(default_reference_chain: str, chain_panels:
     return chain_panels[0].reference_chain
 
 
+def _preferred_default_reference_chain(requested_reference_chains: list[str]) -> str:
+    """Pick the preferred default chain before any per-chain build failures."""
+
+    if "A" in requested_reference_chains:
+        return "A"
+    return requested_reference_chains[0]
+
+
 def _prefix_messages(prefix: str, messages: Iterable[str]) -> list[str]:
     return [f"{prefix}: {message}" for message in messages]
 
@@ -454,6 +474,9 @@ def _write_report_artifacts(
     write_tracks_json(report_data, json_path)
     artifacts.append(json_path.name)
 
+    logger.info("[Job %s/%s] Writing CSV statistics exports to %s", job_index, total_jobs, output_dir / "csv")
+    artifacts.extend(write_statistics_csvs(report_data, output_dir))
+
     return artifacts
 
 
@@ -473,8 +496,14 @@ def _build_panel_data_for_reference_chain(
     axis = build_sequence_axis(reference_chain)
     logger.info("Job %s / Chain %s: computing hydropathy track", job_name, reference_chain_id)
     hydropathy = compute_hydropathy(axis, config.hyd_window)
+    antibody_numberings, antibody_warnings = annotate_antibody_chain(
+        reference_chain.sequence,
+        axis,
+        chain_id=reference_chain_id,
+    )
 
     warnings: list[str] = []
+    warnings.extend(antibody_warnings)
     partial_reasons: list[str] = []
     model_tracks: list[ModelTracks] = []
     for structure_index, structure in enumerate(parsed_structures, start=1):
@@ -560,6 +589,7 @@ def _build_panel_data_for_reference_chain(
         msa=msa,
         hydropathy=hydropathy,
         render_config=render_config,
+        antibody_numberings=antibody_numberings,
         warnings=warnings,
         status=panel_status,
     )
@@ -570,9 +600,11 @@ def _run_dssp_for_structure(
     structure: ParsedStructure,
     logger: logging.Logger,
 ):
-    if "display_name" in signature(run_dssp).parameters:
-        return run_dssp(structure.source_path, logger, display_name=structure.display_source_path.name)
-    return run_dssp(structure.source_path, logger)
+    return run_dssp(
+        structure.source_path,
+        logger,
+        display_name=structure.display_source_path.name,
+    )
 
 
 def _build_msa_data(

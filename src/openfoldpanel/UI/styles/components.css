@@ -28,8 +28,7 @@
 .chain-control {
   display: grid;
   gap: 8px;
-  align-self: center;
-  margin-top: 30px;
+  align-self: start;
 }
 
 .ofp-chain-label,

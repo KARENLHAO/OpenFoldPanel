@@ -9,7 +9,8 @@ from itertools import groupby
 from pathlib import Path
 
 from openfoldpanel.constants import PLDDT_THRESHOLDS
-from openfoldpanel.models import ContactEntry, JobPanelData, SecondaryStructureEntry
+from openfoldpanel.features.antibody_annotation import normalize_antibody_scheme
+from openfoldpanel.models import AntibodyAnnotation, ContactEntry, JobPanelData, RegionAnnotation, SecondaryStructureEntry
 from openfoldpanel.render.font_assets import embedded_times_new_roman_css
 from openfoldpanel.render.glyphs import helix_path, strand_points, turn_path
 from openfoldpanel.render.layout import LayoutBlock, LayoutRow, PanelLayout, build_panel_layout
@@ -32,24 +33,25 @@ class TickCandidate:
     priority: int
 
 
-def render_panel_svg(panel_data: JobPanelData) -> tuple[str, PanelLayout]:
+def render_panel_svg(panel_data: JobPanelData, *, antibody_scheme: str | None = None) -> tuple[str, PanelLayout]:
     """Render a panel into SVG markup without writing to disk."""
 
     layout = build_panel_layout(panel_data)
-    svg = _render_svg_string(panel_data, layout)
+    svg = _render_svg_string(panel_data, layout, antibody_scheme=antibody_scheme)
     return svg, layout
 
 
-def render_svg(panel_data: JobPanelData, output_path: Path) -> PanelLayout:
+def render_svg(panel_data: JobPanelData, output_path: Path, *, antibody_scheme: str | None = None) -> PanelLayout:
     """Render the panel to an SVG file."""
 
-    svg, layout = render_panel_svg(panel_data)
+    svg, layout = render_panel_svg(panel_data, antibody_scheme=antibody_scheme)
     output_path.write_text(svg, encoding="utf-8")
     return layout
 
 
-def _render_svg_string(panel_data: JobPanelData, layout: PanelLayout) -> str:
+def _render_svg_string(panel_data: JobPanelData, layout: PanelLayout, *, antibody_scheme: str | None = None) -> str:
     config = layout.render_config
+    resolved_scheme = _resolve_antibody_scheme(panel_data, antibody_scheme)
     pieces = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{layout.width:.2f}" height="{layout.height:.2f}" viewBox="0 0 {layout.width:.2f} {layout.height:.2f}">',
@@ -57,7 +59,7 @@ def _render_svg_string(panel_data: JobPanelData, layout: PanelLayout) -> str:
         _style_block(config),
     ]
     for block in layout.blocks:
-        pieces.append(_render_block(panel_data, layout, block))
+        pieces.append(_render_block(panel_data, layout, block, antibody_scheme=resolved_scheme))
     pieces.append("</svg>")
     return "\n".join(pieces)
 
@@ -71,6 +73,8 @@ def _style_block(config) -> str:
         f'.track-label{{font-family:{config.font_family};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-style:italic;font-weight:700;}}'
         f'.homolog-label{{font-family:{config.font_family};font-size:{config.font_size - 0.3}px;fill:{config.colors["text"]};font-weight:600;}}'
         f'.annotation-label{{font-family:{config.heading_font_family};font-size:{config.font_size + 1.2}px;font-weight:700;}}'
+        f'.antibody-numbering-label{{font-family:{config.font_family};font-size:{config.font_size - 0.2}px;fill:{config.colors["muted_text"]};font-weight:500;}}'
+        f'.antibody-numbering-line{{stroke:{config.colors["muted_text"]};stroke-width:1.15;stroke-linecap:round;}}'
         f'.tick-label{{font-family:{shared_font};font-size:{config.font_size}px;fill:{config.colors["strand_fill"]};font-weight:700;}}'
         f'.sequence-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
         f'.contact-text{{font-family:{shared_font};font-size:{config.font_size + 0.9}px;font-weight:700;dominant-baseline:middle;text-anchor:middle;}}'
@@ -85,7 +89,7 @@ def _style_block(config) -> str:
     )
 
 
-def _render_block(panel_data: JobPanelData, layout: PanelLayout, block: LayoutBlock) -> str:
+def _render_block(panel_data: JobPanelData, layout: PanelLayout, block: LayoutBlock, *, antibody_scheme: str | None) -> str:
     config = layout.render_config
     grid_x = config.margin + config.label_width
     pieces = [f'<g transform="translate({block.x:.2f},{block.y:.2f})">']
@@ -95,7 +99,7 @@ def _render_block(panel_data: JobPanelData, layout: PanelLayout, block: LayoutBl
 
     for row, y, height in zip(layout.rows, layout.row_positions, layout.row_heights, strict=True):
         pieces.append(_render_row_label(row, y, height, config))
-        pieces.append(_render_row(panel_data, row, block, y, height, layout))
+        pieces.append(_render_row(panel_data, row, block, y, height, layout, antibody_scheme=antibody_scheme))
 
     grid_end = grid_x + (block.end - block.start) * config.cell_width
     pieces.append(f'<line class="soft-rule" x1="{grid_x:.2f}" y1="{layout.tick_y + layout.tick_height:.2f}" x2="{grid_end:.2f}" y2="{layout.tick_y + layout.tick_height:.2f}"/>')
@@ -160,6 +164,32 @@ def _render_sequence_ticks(panel_data: JobPanelData, block: LayoutBlock, layout:
     return "\n".join(pieces)
 
 
+def _clip_region(region: RegionAnnotation, block: LayoutBlock) -> tuple[int, int] | None:
+    if region.end <= block.start or region.start >= block.end:
+        return None
+    return max(region.start, block.start), min(region.end, block.end)
+
+
+def _resolve_antibody_scheme(panel_data: JobPanelData, antibody_scheme: str | None) -> str | None:
+    if not panel_data.antibody_numberings:
+        return None
+    if antibody_scheme is not None:
+        normalized = normalize_antibody_scheme(antibody_scheme)
+        if normalized in panel_data.antibody_numberings:
+            return normalized
+    default_scheme = normalize_antibody_scheme(panel_data.default_antibody_numbering_scheme)
+    if default_scheme in panel_data.antibody_numberings:
+        return default_scheme
+    return next(iter(panel_data.antibody_numberings), None)
+
+
+def _current_antibody_annotation(panel_data: JobPanelData, antibody_scheme: str | None) -> AntibodyAnnotation | None:
+    resolved_scheme = _resolve_antibody_scheme(panel_data, antibody_scheme)
+    if resolved_scheme is None:
+        return None
+    return panel_data.antibody_numberings.get(resolved_scheme)
+
+
 def _register_tick_candidate(candidates_by_axis: dict[int, TickCandidate], candidate: TickCandidate) -> None:
     existing = candidates_by_axis.get(candidate.axis_index)
     if existing is None or candidate.priority > existing.priority:
@@ -188,9 +218,20 @@ def _tick_label_bounds(candidate: TickCandidate, font_size: int) -> tuple[float,
     return text_start, text_start + text_width
 
 
-def _render_row(panel_data: JobPanelData, row: LayoutRow, block: LayoutBlock, y: float, height: float, layout: PanelLayout) -> str:
+def _render_row(
+    panel_data: JobPanelData,
+    row: LayoutRow,
+    block: LayoutBlock,
+    y: float,
+    height: float,
+    layout: PanelLayout,
+    *,
+    antibody_scheme: str | None,
+) -> str:
     if row.kind == "secondary":
         return _render_secondary_row(panel_data, row.model_index, block, y, height, layout)
+    if row.kind == "antibody_numbering":
+        return _render_antibody_numbering_row(panel_data, block, y, height, layout, antibody_scheme=antibody_scheme)
     if row.kind == "confidence":
         return _render_confidence_row(panel_data, row.model_index, block, y, height, layout)
     if row.kind in {"msa_query", "msa_homolog"}:
@@ -202,6 +243,43 @@ def _render_row(panel_data: JobPanelData, row: LayoutRow, block: LayoutBlock, y:
     if row.kind == "contacts":
         return _render_contacts_row(panel_data, row.model_index, block, y, height, layout)
     return ""
+
+
+def _render_antibody_numbering_row(
+    panel_data: JobPanelData,
+    block: LayoutBlock,
+    y: float,
+    height: float,
+    layout: PanelLayout,
+    *,
+    antibody_scheme: str | None,
+) -> str:
+    annotation = _current_antibody_annotation(panel_data, antibody_scheme)
+    if annotation is None:
+        return ""
+
+    config = layout.render_config
+    grid_x = config.margin + config.label_width
+    line_y = y + height * 0.76
+    label_y = y + height * 0.48
+    pieces: list[str] = []
+    for region in annotation.regions:
+        clipped = _clip_region(region, block)
+        if clipped is None:
+            continue
+        clipped_start, clipped_end = clipped
+        x = grid_x + (clipped_start - block.start) * config.cell_width
+        width = (clipped_end - clipped_start) * config.cell_width
+        label_x = x + width / 2.0
+        pieces.append(
+            f'<text class="antibody-numbering-label" x="{label_x:.2f}" y="{label_y:.2f}" text-anchor="middle">'
+            f"{html.escape(region.display_label)}</text>"
+        )
+        pieces.append(
+            f'<line class="antibody-numbering-line" x1="{x + 0.5:.2f}" y1="{line_y:.2f}" '
+            f'x2="{x + width - 0.5:.2f}" y2="{line_y:.2f}"/>'
+        )
+    return "\n".join(pieces)
 
 
 def _segment_ranges(track: list[SecondaryStructureEntry], block: LayoutBlock, category: str) -> list[tuple[int, int]]:

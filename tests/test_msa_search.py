@@ -101,7 +101,7 @@ def test_blast_search_uses_structured_identifier_when_present_for_regular_databa
                 returncode=0,
                 stdout=(
                     "sp|P01674.1|\tsp|P01674|KV3AM_MOUSE;sp|P01674.1|\tRecName: Full=Ig kappa chain V-III region MOPC 63;\tACD-EF\n"
-                    "pdb|5B8C|A\tpdb|5B8C|A\tChain A, Example protein\tGHI-JK\n"
+                    "pdb|5B8C|2\tpdb|5B8C|2\tPolymer entity 2, Example protein\tGHI-JK\n"
                     "gnl|demo|entry-1\tgnl|demo|entry-1\tExample database protein\tLMN-OP\n"
                 ),
                 stderr="",
@@ -125,7 +125,7 @@ def test_blast_search_uses_structured_identifier_when_present_for_regular_databa
     ]
     assert rows == [
         ("sp|P01674|KV3AM_MOUSE", "ACDEF"),
-        ("pdb|5B8C|A", "GHIJK"),
+        ("pdb|5B8C|2", "GHIJK"),
         ("gnl|demo|entry-1", "LMNOP"),
     ]
 
@@ -179,7 +179,7 @@ def test_mmseqs_search_uses_fasta_header_token_and_full_sequence(monkeypatch, tm
         (
             ">sp|Q15116|PDCD1_HUMAN RecName: Full=Programmed cell death protein 1;\n"
             "PWNPPTFSPALL\n"
-            ">pdb|5B8C|A Chain A, Example protein\n"
+            ">pdb|5B8C|2 Polymer entity 2, Example protein\n"
             "MGHIJK\n"
         ),
         encoding="utf-8",
@@ -188,7 +188,7 @@ def test_mmseqs_search_uses_fasta_header_token_and_full_sequence(monkeypatch, tm
     output_path.write_text(
         (
             "sp|Q15116.3|\tRecName: Full=Programmed cell death protein 1;\tWNPPTFSPALL\n"
-            "pdb|5B8C|A\tpdb|5B8C|A Chain A, Example protein\tGHI-JK\n"
+            "pdb|5B8C|2\tpdb|5B8C|2 Polymer entity 2, Example protein\tGHI-JK\n"
             "gnl|demo|entry-1\tExample database protein\tLMN-OP\n"
         ),
         encoding="utf-8",
@@ -227,7 +227,7 @@ def test_mmseqs_search_uses_fasta_header_token_and_full_sequence(monkeypatch, tm
     ]
     assert rows == [
         ("sp|Q15116|PDCD1_HUMAN", "PWNPPTFSPALL"),
-        ("pdb|5B8C|A", "MGHIJK"),
+        ("pdb|5B8C|2", "MGHIJK"),
         ("gnl|demo|entry-1", "LMNOP"),
     ]
     assert "MMseqs evalue threshold: 1e-8" in caplog.text

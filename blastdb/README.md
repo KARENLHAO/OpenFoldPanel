@@ -16,10 +16,10 @@ For long-term reproducible use, the recommended workflow is to download the raw 
 | UniProt Swiss-Prot FASTA | `swissprot_fasta/` | General protein sequence source input | Build a database, then pass the generated prefix |
 | NCBI `swissprot` BLAST DB | `swissprot/` | Prebuilt Swiss-Prot BLAST database | Pass `./blastdb/swissprot/swissprot` directly |
 | NCBI `pdbaa` BLAST DB | `pdbaa/` | Prebuilt PDBAA BLAST database | Pass `./blastdb/pdbaa/pdbaa` directly |
-| Raw PDB cluster files | `pdb_cluster_src/` | `pdb_seqres.txt` and `clusters-by-entity-{50,70,90,95}.txt` | Inputs for building chain-level `PDBAA50/70/90/95` FASTA and BLAST databases |
+| Raw PDB cluster files | `pdb_cluster_src/` | `clusters-by-entity-{50,70,90,95}.txt` and optional auxiliary files | Inputs for building entity-level `PDBAA50/70/90/95` FASTA and BLAST databases |
 | Download script | `Download_db.sh` | Downloads raw files and prebuilt BLAST databases | Fetch resources first |
 | Generic build script | `Build_blastdb.sh` | Builds a BLAST database from FASTA or sequence files | FASTA -> BLAST prefix |
-| PDBAA cluster build script | `Build_pdbaa_clusters.py` | Builds `PDBAA50/70/90/95` chain-level FASTA and optional BLAST prefixes from raw PDB cluster data | Use after `pdb-clusters` download |
+| PDBAA cluster build script | `Build_pdbaa_clusters.py` | Builds `PDBAA50/70/90/95` entity-level FASTA and optional BLAST prefixes from raw PDB cluster data | Use after `pdb-clusters` download |
 
 ## Dependency Requirements
 
@@ -42,7 +42,7 @@ Three common paths are supported:
 
 1. Use the prebuilt `pdbaa` BLAST database directly
 2. Download a raw FASTA file and build your own database with `Build_blastdb.sh`
-3. Download `pdb-clusters` and build chain-level `PDBAA50/70/90/95` with `Build_pdbaa_clusters.py`
+3. Download `pdb-clusters` and build entity-level `PDBAA50/70/90/95` with `Build_pdbaa_clusters.py`
 
 If you only want the fastest way to get the pipeline working, using `pdbaa` directly is the simplest option.
 If you need representative-only PDB sequence databases that align with the RCSB entity clusters at `50 / 70 / 90 / 95%` identity, use the `PDBAA50/70/90/95` workflow below.
@@ -119,20 +119,19 @@ python -m openfoldpanel \
 
 ## Build PDBAA50 / 70 / 90 / 95
 
-`Build_pdbaa_clusters.py` converts RCSB cluster representatives into chain-level FASTA headers like `pdb|5B8C|A`, then optionally builds BLAST database prefixes from those FASTA files.
+`Build_pdbaa_clusters.py` converts RCSB cluster representatives into polymer-entity FASTA headers like `pdb|5B8C|2`, then optionally builds BLAST database prefixes from those FASTA files.
 
 The workflow is:
 
 1. Treat `clusters-by-entity-{50,70,90,95}.txt` as the authoritative representative definition
 2. Keep only the first token from each cluster line
 3. Keep only PDB representative tokens such as `5B8C_2`; skip `AF_...` and `MA_...`
-4. Use `polymer_entity` metadata to resolve `entry + entity -> canonical auth_asym_id`
-5. Pull the sequence itself from local `pdb_seqres.txt` protein-chain records only
-6. Write FASTA headers as `pdb|ENTRY|CHAIN`
+4. Use the RCSB `polymer_entity` record itself as the authoritative sequence source
+5. Pull the sequence from `entity_poly.pdbx_seq_one_letter_code_can`, or fall back to `entity_poly.pdbx_seq_one_letter_code`
+6. Write FASTA headers as `pdb|ENTRY|ENTITY`
 
 Required input directory contents:
 
-- `pdb_seqres.txt`
 - `clusters-by-entity-50.txt`
 - `clusters-by-entity-70.txt`
 - `clusters-by-entity-90.txt`
@@ -177,21 +176,21 @@ Outputs are written under `./blastdb/build/`:
 
 The build cache is shared across identities:
 
-- `./blastdb/build/pdbaa_cache/entity_chain_map.json`
+- `./blastdb/build/pdbaa_cache/polymer_entity_map.json`
 
 Recommended acceptance checks:
 
 - FASTA headers match `^pdb\|[0-9A-Z]{4}\|[^|[:space:]]+$`
-- FASTA does not contain `AF_`, `MA_`, or `mol:na`
-- Multi-chain entries such as `5B8C` resolve to chain-level headers rather than entity tokens
-- `blastdbcmd` can retrieve a record directly by chain-level identifier
+- FASTA does not contain `AF_`, `MA_`, or chain-level `pdb|ENTRY|CHAIN` records
+- Representative tokens such as `5B8C_2` become entity-level headers such as `pdb|5B8C|2`
+- `blastdbcmd` can retrieve a record directly by entity-level identifier
 
 Example:
 
 ```bash
 blastdbcmd \
   -db ./blastdb/build/pdbaa95/pdbaa95 \
-  -entry 'pdb|5B8C|A'
+  -entry 'pdb|5B8C|2'
 ```
 
 ## Use a Prebuilt BLAST Database Directly

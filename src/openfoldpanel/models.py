@@ -22,6 +22,8 @@ class PipelineConfig:
     keep_temp: bool
     contact_cutoff: float
     strong_contact_cutoff: float
+    tm_cluster_cutoff: float
+    disable_tm_clustering: bool
     verbose: bool = False
 
 
@@ -187,6 +189,21 @@ class ConservationEntry:
 
 
 @dataclass(slots=True)
+class RegionAnnotation:
+    name: str
+    start: int
+    end: int
+    display_label: str
+
+
+@dataclass(slots=True)
+class AntibodyAnnotation:
+    scheme: str
+    chain_type: str
+    regions: list[RegionAnnotation] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class MSAData:
     enabled: bool
     query: str
@@ -224,6 +241,8 @@ class JobPanelData:
     msa: MSAData
     hydropathy: list[HydropathyEntry]
     render_config: RenderConfig
+    antibody_numberings: dict[str, AntibodyAnnotation] = field(default_factory=dict)
+    default_antibody_numbering_scheme: str = "kabat"
     warnings: list[str] = field(default_factory=list)
     status: str = "success"
 
@@ -233,6 +252,7 @@ class JobReportData:
     job_name: str
     default_reference_chain: str
     chain_panels: list[JobPanelData]
+    batch_analysis: BatchAnalysis | None = None
     warnings: list[str] = field(default_factory=list)
     status: str = "success"
 
@@ -245,6 +265,81 @@ class JobRunResult:
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
     artifacts: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class TMScoreClusterAssignment:
+    structure_name: str
+    cluster_id: int
+    cluster_size: int
+    cluster_center: str
+    is_representative: bool
+    mean_intra_cluster_tm_score: float
+
+
+@dataclass(slots=True)
+class TMScoreCluster:
+    cluster_id: int
+    size: int
+    center_structure: str
+    members: list[str] = field(default_factory=list)
+    mean_cluster_tm_score: float | None = None
+
+
+@dataclass(slots=True)
+class TMScoreAnalysis:
+    enabled: bool
+    available: bool
+    cutoff: float
+    structure_names: list[str] = field(default_factory=list)
+    matrix: list[list[float]] = field(default_factory=list)
+    clusters: list[TMScoreCluster] = field(default_factory=list)
+    assignments: list[TMScoreClusterAssignment] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ContactConsensusScope:
+    scope: str
+    reference_chain: str
+    model_count: int
+    cluster_center_structure: str = ""
+    structure_names: list[str] = field(default_factory=list)
+    union_count: int = 0
+    intersection_count: int = 0
+    union_positions: str = ""
+    intersection_positions: str = ""
+    union_sequence: str = ""
+    intersection_sequence: str = ""
+
+
+@dataclass(slots=True)
+class ContactConsensusResidue:
+    scope: str
+    reference_chain: str
+    cluster_center_structure: str
+    model_count: int
+    axis_position: int
+    axis_label: str
+    seq_id: int
+    insertion_code: str
+    uid: str
+    one_letter: str
+    occurrence_count: int
+    occurrence_fraction: float
+    in_intersection: bool
+
+
+@dataclass(slots=True)
+class ContactConsensusAnalysis:
+    scopes: list[ContactConsensusScope] = field(default_factory=list)
+    residues: list[ContactConsensusResidue] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class BatchAnalysis:
+    tm_score: TMScoreAnalysis
+    contact_consensus: ContactConsensusAnalysis
 
 
 def dataclass_to_dict(value: Any) -> Any:

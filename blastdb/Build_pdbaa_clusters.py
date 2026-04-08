@@ -19,8 +19,11 @@ BUILD_DIR = SCRIPT_DIR / "build"
 BUILD_BLASTDB_SCRIPT = SCRIPT_DIR / "Build_blastdb.sh"
 SUPPORTED_IDENTITIES = (50, 70, 90, 95)
 API_URL_TEMPLATE = "https://data.rcsb.org/rest/v1/core/polymer_entity/{entry_id}/{entity_id}"
-PDB_SEQRES_FILENAME = "pdb_seqres.txt"
+POLYMER_ENTITY_TIMEOUT_SECONDS = 30
+POLYMER_ENTITY_FETCH_ATTEMPTS = 3
+POLYMER_ENTITY_RETRY_DELAY_SECONDS = 1.0
 PDB_ENTITY_TOKEN_RE = re.compile(r"^[0-9A-Z]{4}_[0-9]+$")
+ENTITY_FASTA_HEADER_RE = re.compile(r"^pdb\|[0-9A-Z]{4}\|[0-9]+$")
 
 
 def log(message: str) -> None:
@@ -66,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--pdb-cluster-src",
         type=_parse_cluster_dir,
         required=True,
-        help="Path to the directory containing pdb_seqres.txt and clusters-by-entity-{50,70,90,95}.txt.",
+        help="Path to the directory containing clusters-by-entity-{50,70,90,95}.txt.",
     )
     parser.add_argument(
         "--build-blastdb",
@@ -78,17 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--sleep-seconds",
         type=_parse_sleep_seconds,
         default=0.02,
-        help="Delay between RCSB Data API requests.",
+        help="Delay between new RCSB Data API requests.",
     )
     return parser
 
 
 def cluster_file_path(cluster_dir: Path, identity: int) -> Path:
     return cluster_dir / f"clusters-by-entity-{identity}.txt"
-
-
-def pdb_seqres_path(cluster_dir: Path) -> Path:
-    return cluster_dir / PDB_SEQRES_FILENAME
 
 
 def fasta_output_path(identity: int) -> Path:
@@ -99,8 +98,8 @@ def blast_prefix_path(identity: int) -> Path:
     return BUILD_DIR / f"pdbaa{identity}" / f"pdbaa{identity}"
 
 
-def entity_chain_cache_path() -> Path:
-    return BUILD_DIR / "pdbaa_cache" / "entity_chain_map.json"
+def polymer_entity_cache_path() -> Path:
+    return BUILD_DIR / "pdbaa_cache" / "polymer_entity_map.json"
 
 
 def iter_representative_entities(path: Path) -> list[str]:
@@ -118,82 +117,45 @@ def iter_representative_entities(path: Path) -> list[str]:
     return representatives
 
 
-def load_pdb_protein_chain_sequences(path: Path) -> dict[tuple[str, str], str]:
-    sequences: dict[tuple[str, str], str] = {}
-    header: str | None = None
-    sequence_chunks: list[str] = []
-
-    def commit_record(raw_header: str | None, chunks: list[str]) -> None:
-        if raw_header is None:
-            return
-        header_text = raw_header.strip()
-        if "mol:protein" not in header_text.lower():
-            return
-
-        token = header_text.split(None, 1)[0]
-        if "_" not in token:
-            warn(f"{path.name} has an unexpected FASTA header and it was skipped: {header_text}")
-            return
-
-        entry_id, chain_id = token.split("_", 1)
-        sequence = re.sub(r"\s+", "", "".join(chunks))
-        if not entry_id or not chain_id or not sequence:
-            warn(f"{path.name} has an incomplete protein FASTA record and it was skipped: {header_text}")
-            return
-
-        sequences[(entry_id.upper(), chain_id)] = sequence
-
-    with path.open("r", encoding="utf-8") as handle:
-        for raw_line in handle:
-            line = raw_line.rstrip("\n")
-            if line.startswith(">"):
-                commit_record(header, sequence_chunks)
-                header = line[1:]
-                sequence_chunks = []
-                continue
-            if header is not None:
-                sequence_chunks.append(line.strip())
-
-    commit_record(header, sequence_chunks)
-    return sequences
-
-
-def load_entity_chain_cache(path: Path) -> dict[str, dict[str, str]]:
+def load_polymer_entity_cache(path: Path) -> dict[str, dict[str, str]]:
     if not path.exists():
         return {}
 
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        die(f"Entity-chain cache is not valid JSON: {path} ({exc})")
+        die(f"Polymer-entity cache is not valid JSON: {path} ({exc})")
 
     if not isinstance(payload, dict):
-        die(f"Entity-chain cache must contain a JSON object: {path}")
+        die(f"Polymer-entity cache must contain a JSON object: {path}")
 
     normalized: dict[str, dict[str, str]] = {}
     for raw_key, raw_value in payload.items():
         if not isinstance(raw_key, str) or not isinstance(raw_value, dict):
-            warn(f"Malformed entity-chain cache entry was skipped: {raw_key}")
+            warn(f"Malformed polymer-entity cache entry was skipped: {raw_key}")
             continue
 
         entry_id = raw_value.get("entry_id")
         entity_id = raw_value.get("entity_id")
-        chain_id = raw_value.get("chain_id")
-        if not all(isinstance(item, str) and item.strip() for item in (entry_id, entity_id, chain_id)):
-            warn(f"Incomplete entity-chain cache entry was skipped: {raw_key}")
+        header = raw_value.get("header")
+        sequence = raw_value.get("sequence")
+        description = raw_value.get("description", "")
+        if not all(isinstance(item, str) and item.strip() for item in (entry_id, entity_id, header, sequence)):
+            warn(f"Incomplete polymer-entity cache entry was skipped: {raw_key}")
             continue
 
         cache_key = raw_key.upper()
         normalized[cache_key] = {
             "entry_id": entry_id.upper(),
-            "entity_id": entity_id,
-            "chain_id": chain_id.strip(),
+            "entity_id": entity_id.strip(),
+            "header": header.strip(),
+            "sequence": sequence.strip(),
+            "description": description.strip() if isinstance(description, str) else "",
         }
-
     return normalized
 
 
-def save_entity_chain_cache(path: Path, cache: dict[str, dict[str, str]]) -> None:
+def save_polymer_entity_cache(path: Path, cache: dict[str, dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(".json.tmp")
     serialized = json.dumps(cache, indent=2, sort_keys=True)
@@ -201,36 +163,86 @@ def save_entity_chain_cache(path: Path, cache: dict[str, dict[str, str]]) -> Non
     temp_path.replace(path)
 
 
-def _first_chain_id(payload: dict, entity_token: str) -> str:
-    container = payload.get("rcsb_polymer_entity_container_identifiers") or {}
-    for key in ("auth_asym_ids", "asym_ids"):
-        value = container.get(key)
-        if isinstance(value, list):
-            for item in value:
-                if isinstance(item, str) and item.strip():
-                    return item.strip()
-        elif isinstance(value, str) and value.strip():
-            return value.strip().split(",")[0].strip()
-    raise ValueError(f"no chain identifier was found for {entity_token}")
+def build_entity_header(entry_id: str, entity_id: str) -> str:
+    return f"pdb|{entry_id.upper()}|{entity_id}"
 
 
-def fetch_polymer_entity_chain_mapping(entity_token: str) -> dict[str, str]:
+def _clean_sequence_text(raw_sequence: str) -> str:
+    return re.sub(r"[^A-Za-z]", "", raw_sequence).upper()
+
+
+def extract_polymer_entity_sequence(payload: dict) -> str:
+    entity_poly = payload.get("entity_poly")
+    if not isinstance(entity_poly, dict):
+        return ""
+
+    for key in ("pdbx_seq_one_letter_code_can", "pdbx_seq_one_letter_code"):
+        value = entity_poly.get(key)
+        if isinstance(value, str):
+            sequence = _clean_sequence_text(value)
+            if sequence:
+                return sequence
+    return ""
+
+
+def extract_polymer_entity_description(payload: dict) -> str:
+    rcsb_polymer_entity = payload.get("rcsb_polymer_entity")
+    if not isinstance(rcsb_polymer_entity, dict):
+        return ""
+    value = rcsb_polymer_entity.get("pdbx_description")
+    if isinstance(value, str):
+        return value.strip()
+    return ""
+
+
+def _is_timeout_error(exc: BaseException) -> bool:
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(exc, URLError):
+        reason = exc.reason
+        if isinstance(reason, TimeoutError):
+            return True
+        if isinstance(reason, str):
+            return "timed out" in reason.lower()
+        return "timed out" in str(reason).lower()
+    return False
+
+
+def fetch_polymer_entity_record(entity_token: str) -> dict[str, str]:
     entry_id, entity_id = entity_token.rsplit("_", 1)
     request = Request(
         API_URL_TEMPLATE.format(entry_id=entry_id, entity_id=entity_id),
         headers={"User-Agent": "OpenFoldPanel-blastdb/1.0"},
     )
-    with urlopen(request, timeout=30) as response:
-        payload = json.load(response)
+
+    last_error: BaseException | None = None
+    for attempt in range(1, POLYMER_ENTITY_FETCH_ATTEMPTS + 1):
+        try:
+            with urlopen(request, timeout=POLYMER_ENTITY_TIMEOUT_SECONDS) as response:
+                payload = json.load(response)
+            break
+        except (URLError, TimeoutError) as exc:
+            last_error = exc
+            if not _is_timeout_error(exc) or attempt == POLYMER_ENTITY_FETCH_ATTEMPTS:
+                raise
+            warn(
+                f"{entity_token} polymer entity metadata fetch timed out on attempt "
+                f"{attempt}/{POLYMER_ENTITY_FETCH_ATTEMPTS}; retrying."
+            )
+            time.sleep(POLYMER_ENTITY_RETRY_DELAY_SECONDS)
+    else:
+        raise RuntimeError(f"polymer entity metadata fetch loop ended unexpectedly for {entity_token}") from last_error
 
     return {
         "entry_id": entry_id.upper(),
         "entity_id": entity_id,
-        "chain_id": _first_chain_id(payload, entity_token),
+        "header": build_entity_header(entry_id, entity_id),
+        "sequence": extract_polymer_entity_sequence(payload),
+        "description": extract_polymer_entity_description(payload),
     }
 
 
-def resolve_entity_chain_mapping(
+def resolve_polymer_entity_record(
     entity_token: str,
     cache: dict[str, dict[str, str]],
     cache_path: Path,
@@ -240,10 +252,11 @@ def resolve_entity_chain_mapping(
     if cached is not None:
         return cached, False
 
-    mapping = fetch_polymer_entity_chain_mapping(cache_key)
-    cache[cache_key] = mapping
-    save_entity_chain_cache(cache_path, cache)
-    return mapping, True
+    record = fetch_polymer_entity_record(cache_key)
+    if record["sequence"]:
+        cache[cache_key] = record
+        save_polymer_entity_cache(cache_path, cache)
+    return record, True
 
 
 def write_fasta_record(handle, header: str, sequence: str) -> None:
@@ -265,19 +278,38 @@ def load_existing_fasta_headers(path: Path) -> set[str]:
     return headers
 
 
-def build_identity_fasta(identity: int, cluster_dir: Path, *, sleep_seconds: float, force: bool) -> tuple[Path, Path]:
+def _validate_entity_level_headers(headers: set[str], path: Path) -> None:
+    invalid_headers = sorted(header for header in headers if ENTITY_FASTA_HEADER_RE.fullmatch(header) is None)
+    if invalid_headers:
+        example = invalid_headers[0]
+        die(
+            f"Existing FASTA output uses legacy or invalid headers ({example}) and cannot be reused safely: "
+            f"{path}. Re-run with --force to rebuild a pure entity-level FASTA."
+        )
+
+
+def build_identity_fasta(
+    identity: int,
+    cluster_dir: Path,
+    *,
+    sleep_seconds: float,
+    force: bool,
+    reuse_existing_fasta: bool = False,
+) -> tuple[Path, Path]:
     cluster_path = cluster_file_path(cluster_dir, identity)
-    seqres_path = pdb_seqres_path(cluster_dir)
     fasta_path = fasta_output_path(identity)
     blast_prefix = blast_prefix_path(identity)
-    cache_path = entity_chain_cache_path()
+    cache_path = polymer_entity_cache_path()
 
     if not cluster_path.exists():
         die(f"Cluster file does not exist: {cluster_path}")
-    if not seqres_path.exists():
-        die(f"PDB SEQRES file does not exist: {seqres_path}")
 
     if fasta_path.exists() and not force:
+        existing_fasta_headers = load_existing_fasta_headers(fasta_path)
+        _validate_entity_level_headers(existing_fasta_headers, fasta_path)
+        if reuse_existing_fasta:
+            log(f"PDBAA{identity}: reusing existing entity-level FASTA {fasta_path}")
+            return fasta_path, blast_prefix
         die(f"FASTA output already exists. Re-run with --force to rebuild: {fasta_path}")
 
     fasta_path.parent.mkdir(parents=True, exist_ok=True)
@@ -290,9 +322,10 @@ def build_identity_fasta(identity: int, cluster_dir: Path, *, sleep_seconds: flo
     if not representatives:
         die(f"No representative entities were found in: {cluster_path}")
 
-    protein_sequences = load_pdb_protein_chain_sequences(seqres_path)
-    cache = load_entity_chain_cache(cache_path)
+    cache = load_polymer_entity_cache(cache_path)
     existing_headers = load_existing_fasta_headers(temp_path)
+    if existing_headers:
+        _validate_entity_level_headers(existing_headers, temp_path)
     resumed_records = len(existing_headers)
     if resumed_records:
         log(f"PDBAA{identity}: resuming from existing temporary FASTA with {resumed_records} record(s)")
@@ -303,20 +336,17 @@ def build_identity_fasta(identity: int, cluster_dir: Path, *, sleep_seconds: flo
     with temp_path.open(open_mode, encoding="utf-8") as handle:
         for index, entity_token in enumerate(representatives, start=1):
             try:
-                mapping, fetched = resolve_entity_chain_mapping(entity_token, cache, cache_path)
-            except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-                die(f"{entity_token} chain mapping could not be fetched: {exc}")
+                record, fetched = resolve_polymer_entity_record(entity_token, cache, cache_path)
+            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+                die(f"{entity_token} polymer entity metadata could not be fetched: {exc}")
 
-            header = f"pdb|{mapping['entry_id']}|{mapping['chain_id']}"
+            header = record["header"]
             if header in existing_headers:
                 continue
 
-            sequence = protein_sequences.get((mapping["entry_id"], mapping["chain_id"]))
-            if sequence is None:
-                warn(
-                    f"{entity_token} mapped to {mapping['entry_id']} chain {mapping['chain_id']}, "
-                    "but no local protein chain sequence was found; it was skipped."
-                )
+            sequence = record["sequence"]
+            if not sequence:
+                warn(f"{entity_token} did not provide a usable polymer entity sequence; it was skipped.")
                 skipped += 1
                 continue
 
@@ -373,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
             args.pdb_cluster_src,
             sleep_seconds=args.sleep_seconds,
             force=args.force,
+            reuse_existing_fasta=args.build_blastdb,
         )
         if args.build_blastdb:
             build_blast_database(identity, fasta_path, blast_prefix, force=args.force)

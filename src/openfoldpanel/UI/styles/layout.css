@@ -11,7 +11,7 @@
 .ofp-toolbar,
 .toolbar {
   display: flex;
-  align-items: start;
+  align-items: end;
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
@@ -30,6 +30,14 @@
   gap: 10px;
   flex: 1 1 760px;
   min-width: min(100%, 760px);
+}
+
+.ofp-toolbar-controls,
+.toolbar-controls {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  align-self: end;
 }
 
 .ofp-chain-stage,
@@ -97,12 +105,14 @@
 
   .ofp-toolbar,
   .toolbar {
-    align-items: start;
+    align-items: stretch;
     padding: 18px 16px;
   }
 
   .ofp-chain-control,
-  .chain-control {
+  .chain-control,
+  .ofp-toolbar-controls,
+  .toolbar-controls {
     width: 100%;
   }
 

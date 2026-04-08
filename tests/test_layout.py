@@ -3,12 +3,14 @@ from __future__ import annotations
 from openfoldpanel.features.hydropathy import compute_hydropathy
 from openfoldpanel.models import (
     AccessibilityEntry,
+    AntibodyAnnotation,
     ContactEntry,
     DisulfideBond,
     JobPanelData,
     MSAData,
     MSARow,
     ModelTracks,
+    RegionAnnotation,
     SecondaryStructureEntry,
     SequenceAxisPosition,
 )
@@ -438,3 +440,142 @@ def test_ticks_keep_terminal_label_when_it_does_not_overlap():
 
     assert ">110<" in svg
     assert ">113<" in svg
+
+
+def test_cdr_annotations_render_above_secondary_annotations_with_muted_labels():
+    config = build_render_config(columns=8, font_size=12)
+    axis = [
+        SequenceAxisPosition(index, "A", index + 1, "", "ALA", "A", str(index + 1))
+        for index in range(8)
+    ]
+    hydropathy = compute_hydropathy(axis, window=3)
+    secondary = [
+        SecondaryStructureEntry(0, "E", "strand"),
+        SecondaryStructureEntry(1, "E", "strand"),
+        SecondaryStructureEntry(2, "H", "alpha_helix"),
+        SecondaryStructureEntry(3, "H", "alpha_helix"),
+        SecondaryStructureEntry(4, "I", "pi_helix"),
+        SecondaryStructureEntry(5, "I", "pi_helix"),
+        SecondaryStructureEntry(6, "C", "coil"),
+        SecondaryStructureEntry(7, "C", "coil"),
+    ]
+    model = ModelTracks(
+        name="ranked_0_A",
+        source_path="model.pdb",
+        chain="A",
+        secondary_structure=secondary,
+        plddt=[90.0] * 8,
+        accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(8)],
+        contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(8)],
+        display_name="CDR Demo / Chain A",
+    )
+    panel = JobPanelData(
+        job_name="demo",
+        reference_chain="A",
+        sequence_axis=axis,
+        models=[model],
+        msa=MSAData(enabled=False, query="AAAAAAAA", rows=[MSARow(identifier="query_sequence", sequence="AAAAAAAA", is_query=True)]),
+        hydropathy=hydropathy,
+        render_config=config,
+        antibody_numberings={
+            "kabat": AntibodyAnnotation(
+                scheme="kabat",
+                chain_type="heavy",
+                regions=[
+                    RegionAnnotation(name="CDR1", start=0, end=2, display_label="CDR1 - Kabat"),
+                    RegionAnnotation(name="CDR2", start=2, end=4, display_label="CDR2 - Kabat"),
+                    RegionAnnotation(name="CDR3", start=4, end=6, display_label="CDR3 - Kabat"),
+                ],
+            )
+        },
+    )
+
+    svg, layout = render_panel_svg(panel)
+
+    antibody_row_index = next(index for index, row in enumerate(layout.rows) if row.kind == "antibody_numbering")
+    secondary_row_index = next(index for index, row in enumerate(layout.rows) if row.kind == "secondary")
+    confidence_row_index = next(index for index, row in enumerate(layout.rows) if row.kind == "confidence")
+
+    assert 'class="antibody-numbering-label"' in svg
+    assert 'class="antibody-numbering-line"' in svg
+    assert ">CDR1 - Kabat<" in svg
+    assert ">CDR2 - Kabat<" in svg
+    assert ">CDR3 - Kabat<" in svg
+    assert svg.count(">β1<") == 1
+    assert svg.count(">α1<") == 1
+    assert secondary_row_index < antibody_row_index < confidence_row_index
+    assert "#5a6d77" in svg
+
+
+def test_cdr_annotations_clip_and_repeat_per_visible_block_segment():
+    config = build_render_config(columns=4, font_size=12)
+    axis = [
+        SequenceAxisPosition(index, "A", index + 1, "", "ALA", "A", str(index + 1))
+        for index in range(8)
+    ]
+    hydropathy = compute_hydropathy(axis, window=3)
+    model = ModelTracks(
+        name="ranked_0_A",
+        source_path="model.pdb",
+        chain="A",
+        secondary_structure=[SecondaryStructureEntry(index, "C", "coil") for index in range(8)],
+        plddt=[90.0] * 8,
+        accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(8)],
+        contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(8)],
+        display_name="Wrapped CDR Demo / Chain A",
+    )
+    panel = JobPanelData(
+        job_name="demo",
+        reference_chain="A",
+        sequence_axis=axis,
+        models=[model],
+        msa=MSAData(enabled=False, query="AAAAAAAA", rows=[MSARow(identifier="query_sequence", sequence="AAAAAAAA", is_query=True)]),
+        hydropathy=hydropathy,
+        render_config=config,
+        antibody_numberings={
+            "imgt": AntibodyAnnotation(
+                scheme="imgt",
+                chain_type="light",
+                regions=[RegionAnnotation(name="CDR1", start=2, end=6, display_label="CDR1 - IMGT")],
+            )
+        },
+        default_antibody_numbering_scheme="imgt",
+    )
+
+    svg, _ = render_panel_svg(panel, antibody_scheme="imgt")
+
+    assert svg.count(">CDR1 - IMGT<") == 2
+    assert svg.count('class="antibody-numbering-line"') == 2
+
+
+def test_layout_keeps_original_annotation_height_without_cdr_labels():
+    base_config = build_render_config(columns=8, font_size=12)
+    axis = [
+        SequenceAxisPosition(index, "A", index + 1, "", "ALA", "A", str(index + 1))
+        for index in range(8)
+    ]
+    hydropathy = compute_hydropathy(axis, window=3)
+    model = ModelTracks(
+        name="ranked_0_A",
+        source_path="model.pdb",
+        chain="A",
+        secondary_structure=[SecondaryStructureEntry(index, "C", "coil") for index in range(8)],
+        plddt=[90.0] * 8,
+        accessibility=[AccessibilityEntry(index, None, 0.5, "accessible") for index in range(8)],
+        contacts=[ContactEntry(index, None, None, None, None, None, None, None) for index in range(8)],
+        display_name="Base Annotation Demo / Chain A",
+    )
+    panel = JobPanelData(
+        job_name="demo",
+        reference_chain="A",
+        sequence_axis=axis,
+        models=[model],
+        msa=MSAData(enabled=False, query="AAAAAAAA", rows=[MSARow(identifier="query_sequence", sequence="AAAAAAAA", is_query=True)]),
+        hydropathy=hydropathy,
+        render_config=base_config,
+    )
+
+    layout = build_panel_layout(panel)
+
+    assert layout.annotation_height > 0
+    assert all(row.kind != "antibody_numbering" for row in layout.rows)

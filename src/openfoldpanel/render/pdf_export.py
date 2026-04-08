@@ -12,5 +12,8 @@ def export_pdf(svg_markup: str, output_path: Path) -> tuple[bool, str | None]:
         import cairosvg  # type: ignore
     except ImportError:
         return False, "CairoSVG is not installed; PDF export was skipped."
-    cairosvg.svg2pdf(bytestring=svg_markup.encode("utf-8"), write_to=str(output_path))
+    try:
+        cairosvg.svg2pdf(bytestring=svg_markup.encode("utf-8"), write_to=str(output_path))
+    except OSError as exc:
+        return False, f"PDF export dependencies are unavailable; PDF export was skipped ({exc})."
     return True, None

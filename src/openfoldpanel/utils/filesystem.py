@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import shutil
-import tempfile
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 
 def ensure_directory(path: Path) -> Path:
@@ -21,14 +18,3 @@ def safe_rmtree(path: Path) -> None:
 
     if path.exists():
         shutil.rmtree(path, ignore_errors=True)
-
-
-@contextmanager
-def temporary_workspace(prefix: str = "openfoldpanel_") -> Iterator[Path]:
-    """Yield a temporary directory path and clean it up afterwards."""
-
-    temp_dir = Path(tempfile.mkdtemp(prefix=prefix))
-    try:
-        yield temp_dir
-    finally:
-        safe_rmtree(temp_dir)

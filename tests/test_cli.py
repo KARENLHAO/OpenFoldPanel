@@ -4,15 +4,26 @@ import json
 import tarfile
 import zipfile
 from importlib import resources
+from types import SimpleNamespace
 
 import pytest
 
 import openfoldpanel.pipeline as pipeline_module
 from openfoldpanel.cli import build_parser, main
 from openfoldpanel.constants import ALLOWED_EVALUES, DEFAULT_EVALUE
+from openfoldpanel.models import AntibodyAnnotation, BatchAnalysis, ContactConsensusAnalysis, RegionAnnotation, TMScoreAnalysis
 from openfoldpanel.features.dssp_runner import DSSPResidueFeature
 from openfoldpanel.utils.text import summarize_msa_database_path
 from tests.conftest import write_test_mmcif, write_test_pdb
+
+
+@pytest.fixture(autouse=True)
+def fake_pdf_export_success(monkeypatch):
+    def fake_export_pdf(svg_markup, output_path):
+        output_path.write_bytes(b"%PDF-1.4\n% OpenFoldPanel test fixture\n")
+        return True, None
+
+    monkeypatch.setattr(pipeline_module, "export_pdf", fake_export_pdf)
 
 
 def test_cli_default_outputs_multi_chain_reports(tmp_path):
@@ -29,6 +40,14 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert (job_dir / "tracks.json").exists()
     assert (job_dir / "summary.txt").exists()
     assert (job_dir / "logs.txt").exists()
+    assert not (job_dir / "csv" / "residue-summary.csv").exists()
+    assert not (job_dir / "csv" / "contacts.csv").exists()
+    assert not (job_dir / "csv" / "model-summary.csv").exists()
+    assert (job_dir / "csv" / "contact-consensus.csv").exists()
+    assert (job_dir / "csv" / "tm-score-matrix.csv").exists()
+    assert (job_dir / "csv" / "tm-clusters.csv").exists()
+    assert not (job_dir / "csv" / "tm-cluster-relations.csv").exists()
+    assert not (job_dir / "csv" / "antibody-summary.csv").exists()
     assert not (job_dir / "panel.svg").exists()
     assert not (job_dir / "panel.png").exists()
 
@@ -37,6 +56,10 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert payload["status"] == "success"
     assert {panel["reference_chain"] for panel in payload["chain_panels"]} == {"A", "B"}
     assert {panel["job_name"] for panel in payload["chain_panels"]} == {"single_model"}
+    assert "batch_analysis" in payload
+    assert payload["batch_analysis"]["tm_score"]["matrix"] == [[1.0]]
+    assert payload["batch_analysis"]["tm_score"]["clusters"][0]["center_structure"] == "single_model.pdb"
+    assert payload["batch_analysis"]["contact_consensus"]["scopes"]
     assert payload["chain_panels"][0]["models"]
     assert any(model["display_name"] == "Single Model / Chain A" for model in payload["chain_panels"][0]["models"])
     assert "disulfides" in payload["chain_panels"][0]["models"][0]
@@ -84,6 +107,7 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "--max-homologs-displayed" in html_text
     assert "--msa-db" in html_text
     assert 'data-chain-select' in html_text
+    assert 'data-antibody-scheme-select' in html_text
     assert 'data-report-page' in html_text
     assert 'data-active-chain-panel' in html_text
     assert 'data-figure-sheet' in html_text
@@ -91,10 +115,11 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert 'ofp-toolbar-summary' in html_text
     assert 'id="ofp-report-payload"' in html_text
     assert 'data-chain-templates' in html_text
-    assert 'template id="ofp-chain-A"' in html_text
-    assert 'template id="ofp-chain-B"' in html_text
+    assert 'template id="ofp-chain-A-kabat"' in html_text
+    assert 'template id="ofp-chain-B-kabat"' in html_text
     assert 'data-chain-figure="A"' in html_text
     assert 'data-chain-figure="B"' in html_text
+    assert 'data-antibody-scheme="kabat"' in html_text
     assert 'data-panel-width="' in html_text
     assert "--active-panel-width:" in html_text
     assert 'ofp-figure-wrap figure-wrap' in html_text
@@ -111,11 +136,15 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert 'data-legend-kind="alpha-turn"' in html_text
     assert 'data-legend-kind="beta-turn"' in html_text
     assert 'data-legend-kind="turn"' not in html_text
+    assert 'data-antibody-legend hidden' in html_text
+    assert 'data-legend-kind="antibody-numbering"' in html_text
     assert "Alpha Helix" in html_text
     assert "3₁₀ Helix" in html_text
     assert "Pi Helix" in html_text
     assert "Alpha Turn" in html_text
     assert "Beta Turn" in html_text
+    assert "Antibody Numbering" in html_text
+    assert "Shows CDR / framework region labels using the currently selected antibody numbering scheme." in html_text
     assert 'data-legend-kind="accessibility-buried"' in html_text
     assert 'data-legend-kind="accessibility-intermediate"' in html_text
     assert 'data-legend-kind="accessibility-accessible"' in html_text
@@ -140,12 +169,23 @@ def test_cli_default_outputs_multi_chain_reports(tmp_path):
     assert "Terminology" not in html_text
     assert "Research Collaboration Report" not in html_text
 
+    summary_text = (job_dir / "summary.txt").read_text()
+    assert "csv/residue-summary.csv" not in summary_text
+    assert "csv/contacts.csv" not in summary_text
+    assert "csv/model-summary.csv" not in summary_text
+    assert "csv/contact-consensus.csv" in summary_text
+    assert "csv/tm-score-matrix.csv" in summary_text
+    assert "csv/tm-clusters.csv" in summary_text
+    assert "csv/tm-cluster-relations.csv" not in summary_text
+    assert "TM-score Cluster Count: 1" in summary_text
+
 
 def test_cli_tracks_json_uses_helix_subtype_categories(tmp_path, monkeypatch):
     input_path = write_test_pdb(tmp_path / "single_model.pdb")
     outdir = tmp_path / "out"
 
-    def fake_run_dssp(structure_path, logger):
+    def fake_run_dssp(structure_path, logger, *, display_name=None):
+        assert display_name == "single_model.pdb"
         return {
             ("A", 1, ""): DSSPResidueFeature("A", 1, "", "A", "G", 42.0),
             ("A", 2, ""): DSSPResidueFeature("A", 2, "", "G", "H", 42.0),
@@ -203,6 +243,22 @@ def test_cli_parser_uses_default_evalue_and_accepts_allowed_values():
         assert args.evalue == evalue
 
 
+def test_cli_parser_accepts_tm_cluster_cutoff():
+    parser = build_parser()
+    args = parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--tm-cluster-cutoff", "0.8"])
+    assert args.tm_cluster_cutoff == 0.8
+
+
+def test_cli_parser_rejects_invalid_tm_cluster_cutoff(capsys):
+    parser = build_parser()
+
+    for cutoff in ("0", "1.2", "-0.1", "abc"):
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args(["--input", "demo.pdb", "--outdir", "out", "--tm-cluster-cutoff", cutoff])
+        assert exc_info.value.code == 2
+        assert "--tm-cluster-cutoff" in capsys.readouterr().err
+
+
 def test_cli_parser_accepts_fasta_msa_database_path():
     parser = build_parser()
     args = parser.parse_args(
@@ -241,6 +297,96 @@ def test_cli_report_renders_uppercase_msa_database_name_from_path_tail(tmp_path)
     assert "SWISSPROT" in html_text
     assert html_text.index("Strong Contact Cutoff") < html_text.index("Homolog Display Limit")
     assert html_text.index("Homolog Display Limit") < html_text.index("Database")
+
+
+def test_cli_tracks_json_includes_antibody_annotation_when_numbering_is_enabled(tmp_path, monkeypatch):
+    input_path = write_test_pdb(tmp_path / "single_model.pdb")
+    outdir = tmp_path / "out"
+
+    def fake_annotate_antibody_chain(sequence, sequence_axis, *, chain_id):
+        assert chain_id == "A"
+        return (
+            {
+                "kabat": AntibodyAnnotation(
+                    scheme="kabat",
+                    chain_type="heavy",
+                    regions=[
+                        RegionAnnotation(name="CDR1", start=0, end=1, display_label="CDR1 - Kabat"),
+                        RegionAnnotation(name="CDR2", start=1, end=2, display_label="CDR2 - Kabat"),
+                        RegionAnnotation(name="CDR3", start=2, end=3, display_label="CDR3 - Kabat"),
+                    ],
+                ),
+                "imgt": AntibodyAnnotation(
+                    scheme="imgt",
+                    chain_type="heavy",
+                    regions=[
+                        RegionAnnotation(name="CDR1", start=0, end=1, display_label="CDR1 - IMGT"),
+                        RegionAnnotation(name="CDR2", start=1, end=2, display_label="CDR2 - IMGT"),
+                        RegionAnnotation(name="CDR3", start=2, end=3, display_label="CDR3 - IMGT"),
+                    ],
+                ),
+            },
+            [],
+        )
+
+    monkeypatch.setattr(pipeline_module, "annotate_antibody_chain", fake_annotate_antibody_chain)
+
+    exit_code = main(
+        [
+            "--input",
+            str(input_path),
+            "--outdir",
+            str(outdir),
+            "--chain",
+            "A",
+        ]
+    )
+    assert exit_code == 0
+
+    payload = json.loads((outdir / "single_model" / "tracks.json").read_text())
+    panel = payload["chain_panels"][0]
+    assert panel["default_antibody_numbering_scheme"] == "kabat"
+    assert set(panel["antibody_numberings"]) == {"kabat", "imgt"}
+    annotation = panel["antibody_numberings"]["kabat"]
+    assert annotation["scheme"] == "kabat"
+    assert annotation["chain_type"] == "heavy"
+    assert [region["name"] for region in annotation["regions"]] == ["CDR1", "CDR2", "CDR3"]
+    html_text = (outdir / "single_model" / "report.html").read_text()
+    assert 'data-antibody-scheme="kabat"' in html_text
+    assert 'data-antibody-scheme="imgt"' in html_text
+    assert 'data-antibody-legend' in html_text
+    assert 'data-antibody-legend hidden' not in html_text
+    assert 'data-legend-kind="antibody-numbering"' in html_text
+    assert "Antibody Numbering" in html_text
+    assert "Shows CDR / framework region labels using the currently selected antibody numbering scheme." in html_text
+
+
+def test_cli_antibody_numbering_warning_does_not_fail_job(tmp_path, monkeypatch):
+    input_path = write_test_pdb(tmp_path / "single_model.pdb")
+    outdir = tmp_path / "out"
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "annotate_antibody_chain",
+        lambda sequence, sequence_axis, *, chain_id: ({}, ["abnumber unavailable for test"]),
+    )
+
+    exit_code = main(
+        [
+            "--input",
+            str(input_path),
+            "--outdir",
+            str(outdir),
+            "--chain",
+            "A",
+        ]
+    )
+    assert exit_code == 0
+
+    payload = json.loads((outdir / "single_model" / "tracks.json").read_text())
+    panel = payload["chain_panels"][0]
+    assert panel["antibody_numberings"] == {}
+    assert "abnumber unavailable for test" in panel["warnings"]
 
 
 def test_cli_report_renders_contact_legend_thresholds_from_config(tmp_path):
@@ -346,8 +492,9 @@ def test_cli_normalizes_cif_input_to_pdb_for_dssp_but_keeps_original_source_name
     outdir = tmp_path / "out"
     seen_dssp_inputs = []
 
-    def fake_run_dssp(structure_path, logger):
+    def fake_run_dssp(structure_path, logger, *, display_name=None):
         seen_dssp_inputs.append(structure_path)
+        assert display_name == "single_model.cif"
         return {}, []
 
     monkeypatch.setattr(pipeline_module, "run_dssp", fake_run_dssp)
@@ -391,11 +538,24 @@ def test_cli_archive_mixed_pdb_and_cif_inputs_are_normalized_before_dssp(tmp_pat
     outdir = tmp_path / "out"
     seen_dssp_inputs = []
 
-    def fake_run_dssp(structure_path, logger):
+    def fake_run_dssp(structure_path, logger, *, display_name=None):
         seen_dssp_inputs.append(structure_path)
+        assert display_name in {"ranked_1.pdb", "ranked_2.cif"}
         return {}, []
 
     monkeypatch.setattr(pipeline_module, "run_dssp", fake_run_dssp)
+    monkeypatch.setattr(
+        pipeline_module,
+        "build_batch_analysis",
+        lambda report_data, parsed_structures, **kwargs: SimpleNamespace(
+            analysis=BatchAnalysis(
+                tm_score=TMScoreAnalysis(enabled=False, available=False, cutoff=0.7),
+                contact_consensus=ContactConsensusAnalysis(),
+            ),
+            warnings=[],
+            partial_reasons=[],
+        ),
+    )
 
     exit_code = main(["--input", str(archive_path), "--outdir", str(outdir)])
     assert exit_code == 0
@@ -403,6 +563,56 @@ def test_cli_archive_mixed_pdb_and_cif_inputs_are_normalized_before_dssp(tmp_pat
     assert len({path.name for path in seen_dssp_inputs}) == 2
     assert all(path.suffix == ".pdb" for path in seen_dssp_inputs)
     assert (outdir / "job_a" / "report.html").exists()
+
+
+def test_cli_marks_partial_success_when_tm_clustering_is_unavailable_for_multi_model_job(tmp_path):
+    archive_path = tmp_path / "models.zip"
+    with zipfile.ZipFile(archive_path, "w") as zf:
+        zf.writestr("job_a/ranked_1.pdb", write_test_pdb(tmp_path / "ranked_1.pdb").read_text())
+        zf.writestr("job_a/ranked_2.pdb", write_test_pdb(tmp_path / "ranked_2.pdb").read_text())
+
+    outdir = tmp_path / "out"
+    exit_code = main(["--input", str(archive_path), "--outdir", str(outdir)])
+    assert exit_code == 0
+
+    job_dir = outdir / "job_a"
+    payload = json.loads((job_dir / "tracks.json").read_text())
+    assert payload["status"] == "partial_success"
+    assert payload["batch_analysis"]["tm_score"]["available"] is False
+    assert (job_dir / "csv" / "contact-consensus.csv").exists()
+    assert not (job_dir / "csv" / "tm-score-matrix.csv").exists()
+    summary_text = (job_dir / "summary.txt").read_text()
+    assert "TM-score Clustering: Unavailable" in summary_text
+    assert "US-align executable was not found on PATH" in summary_text
+
+
+def test_cli_disable_tm_clustering_keeps_multi_model_job_success(tmp_path):
+    archive_path = tmp_path / "models.zip"
+    with zipfile.ZipFile(archive_path, "w") as zf:
+        zf.writestr("job_a/ranked_1.pdb", write_test_pdb(tmp_path / "ranked_1.pdb").read_text())
+        zf.writestr("job_a/ranked_2.pdb", write_test_pdb(tmp_path / "ranked_2.pdb").read_text())
+
+    outdir = tmp_path / "out"
+    exit_code = main(
+        [
+            "--input",
+            str(archive_path),
+            "--outdir",
+            str(outdir),
+            "--disable-tm-clustering",
+        ]
+    )
+    assert exit_code == 0
+
+    job_dir = outdir / "job_a"
+    payload = json.loads((job_dir / "tracks.json").read_text())
+    assert payload["status"] == "success"
+    assert payload["batch_analysis"]["tm_score"]["enabled"] is False
+    assert payload["batch_analysis"]["tm_score"]["available"] is False
+    assert (job_dir / "csv" / "contact-consensus.csv").exists()
+    assert not (job_dir / "csv" / "tm-score-matrix.csv").exists()
+    summary_text = (job_dir / "summary.txt").read_text()
+    assert "TM-score Clustering: Disabled" in summary_text
 
 
 def test_ui_resources_are_available_from_package():

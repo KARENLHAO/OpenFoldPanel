@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from openfoldpanel.models import JobPanelData, JobReportData, JobRunResult
+from openfoldpanel.models import JobReportData, JobRunResult
 from openfoldpanel.utils.text import humanize_chain_label, humanize_identifier, humanize_job_status
 
 
-def write_summary(job_result: JobRunResult, panel_data: JobPanelData | JobReportData | None, path: Path) -> None:
+def write_summary(job_result: JobRunResult, report_data: JobReportData | None, path: Path) -> None:
     """Write a readable summary text file for one job."""
 
     lines = [
@@ -16,25 +16,27 @@ def write_summary(job_result: JobRunResult, panel_data: JobPanelData | JobReport
         f"Job Status: {humanize_job_status(job_result.status)}",
         f"Output Directory: {job_result.output_dir}",
     ]
-    if panel_data is not None:
-        if isinstance(panel_data, JobReportData):
-            rendered_chains = ", ".join(humanize_chain_label(panel.reference_chain) for panel in panel_data.chain_panels)
-            lines.extend(
-                [
-                    f"Default Reference Chain: {humanize_chain_label(panel_data.default_reference_chain)}",
-                    f"Rendered Reference Chains: {rendered_chains}",
-                    f"Rendered Chain Count: {len(panel_data.chain_panels)}",
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    f"Reference Chain: {humanize_chain_label(panel_data.reference_chain)}",
-                    f"Sequence Length: {len(panel_data.sequence_axis)}",
-                    f"Aligned Models: {len(panel_data.models)}",
-                    f"Sequence Alignment: {'Full alignment' if panel_data.msa.enabled else 'Query only'}",
-                ]
-            )
+    if report_data is not None:
+        rendered_chains = ", ".join(humanize_chain_label(panel.reference_chain) for panel in report_data.chain_panels)
+        lines.extend(
+            [
+                f"Default Reference Chain: {humanize_chain_label(report_data.default_reference_chain)}",
+                f"Rendered Reference Chains: {rendered_chains}",
+                f"Rendered Chain Count: {len(report_data.chain_panels)}",
+            ]
+        )
+        if report_data.batch_analysis is not None:
+            tm_score = report_data.batch_analysis.tm_score
+            if not tm_score.enabled:
+                lines.append("TM-score Clustering: Disabled")
+            elif not tm_score.available:
+                lines.append("TM-score Clustering: Unavailable")
+            else:
+                lines.append(f"TM-score Cluster Count: {len(tm_score.clusters)}")
+                for cluster in tm_score.clusters:
+                    lines.append(
+                        f"TM-score Cluster {cluster.cluster_id}: center={cluster.center_structure}; size={cluster.size}"
+                    )
     if job_result.artifacts:
         lines.append("Artifacts:")
         lines.extend(f"  - {artifact}" for artifact in job_result.artifacts)

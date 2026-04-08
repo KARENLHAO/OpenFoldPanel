@@ -12,6 +12,9 @@
 
   const reportPage = document.querySelector("[data-report-page]");
   const chainSelect = document.querySelector("[data-chain-select]");
+  const antibodySchemeControl = document.querySelector("[data-antibody-scheme-control]");
+  const antibodySchemeSelect = document.querySelector("[data-antibody-scheme-select]");
+  const antibodyLegend = document.querySelector("[data-antibody-legend]");
   const activePanel = document.querySelector("[data-active-chain-panel]");
   const figureSheet = document.querySelector("[data-figure-sheet]");
   const summaryGrid = document.querySelector("[data-summary-grid]");
@@ -23,6 +26,7 @@
   const jobWarningList = document.querySelector("[data-job-warning-list]");
 
   const panelByChain = new Map(chainPanels.map((panel) => [panel.referenceChain, panel]));
+  let currentAntibodyScheme = report.defaultAntibodyScheme || "kabat";
 
   const clearChildren = (node) => {
     if (!node) {
@@ -112,26 +116,81 @@
     card.open = true;
   };
 
-  const findTemplate = (chainId) => {
+  const schemeLabel = (scheme) => {
+    if ((scheme || "").toLowerCase() === "imgt") {
+      return "IMGT";
+    }
+    if (!scheme) {
+      return "";
+    }
+    return scheme.charAt(0).toUpperCase() + scheme.slice(1).toLowerCase();
+  };
+
+  const findTemplate = (chainId, antibodyScheme) => {
     const templates = document.querySelectorAll("template[data-chain-figure]");
     for (const template of templates) {
-      if (template.dataset.chainFigure === chainId) {
+      if (
+        template.dataset.chainFigure === chainId &&
+        (template.dataset.antibodyScheme || "") === (antibodyScheme || "")
+      ) {
         return template;
       }
     }
     return null;
   };
 
-  const mountFigure = (chainId) => {
+  const mountFigure = (chainId, antibodyScheme) => {
     if (!figureSheet) {
       return;
     }
     clearChildren(figureSheet);
-    const template = findTemplate(chainId);
+    const template = findTemplate(chainId, antibodyScheme);
     if (!template) {
       return;
     }
     figureSheet.append(template.content.cloneNode(true));
+  };
+
+  const resolveAntibodyScheme = (panel) => {
+    const availableSchemes = Array.isArray(panel?.availableAntibodySchemes) ? panel.availableAntibodySchemes : [];
+    if (!availableSchemes.length) {
+      return panel?.defaultAntibodyScheme || report.defaultAntibodyScheme || "kabat";
+    }
+    if (availableSchemes.includes(currentAntibodyScheme)) {
+      return currentAntibodyScheme;
+    }
+    if (panel.defaultAntibodyScheme && availableSchemes.includes(panel.defaultAntibodyScheme)) {
+      return panel.defaultAntibodyScheme;
+    }
+    return availableSchemes[0];
+  };
+
+  const renderAntibodySchemeControl = (panel) => {
+    if (!antibodySchemeControl || !antibodySchemeSelect) {
+      return;
+    }
+    const availableSchemes = Array.isArray(panel?.availableAntibodySchemes) ? panel.availableAntibodySchemes : [];
+    antibodySchemeControl.hidden = availableSchemes.length === 0;
+    clearChildren(antibodySchemeSelect);
+    if (!availableSchemes.length) {
+      return;
+    }
+    availableSchemes.forEach((scheme) => {
+      const option = document.createElement("option");
+      option.value = scheme;
+      option.textContent = schemeLabel(scheme);
+      antibodySchemeSelect.append(option);
+    });
+    currentAntibodyScheme = resolveAntibodyScheme(panel);
+    antibodySchemeSelect.value = currentAntibodyScheme;
+  };
+
+  const renderAntibodyLegend = (panel) => {
+    if (!antibodyLegend) {
+      return;
+    }
+    const availableSchemes = Array.isArray(panel?.availableAntibodySchemes) ? panel.availableAntibodySchemes : [];
+    antibodyLegend.hidden = availableSchemes.length === 0;
   };
 
   const syncLocationHash = (chainId) => {
@@ -156,6 +215,7 @@
       activePanel.dataset.chainId = panel.referenceChain;
       activePanel.dataset.panelWidth = String(panel.panelWidth);
       activePanel.style.setProperty("--panel-width", `${panel.panelWidth}px`);
+      activePanel.dataset.antibodyScheme = resolveAntibodyScheme(panel);
     }
     if (reportPage) {
       reportPage.style.setProperty("--active-panel-width", `${panel.panelWidth}px`);
@@ -163,7 +223,9 @@
 
     renderSummary(panel.summaryItems || []);
     renderWarnings(chainWarnings, chainWarningsTitle, chainWarningList, "Current Chain Notes", panel.warnings || []);
-    mountFigure(panel.referenceChain);
+    renderAntibodySchemeControl(panel);
+    renderAntibodyLegend(panel);
+    mountFigure(panel.referenceChain, resolveAntibodyScheme(panel));
 
     if (pushHash) {
       syncLocationHash(panel.referenceChain);
@@ -179,6 +241,14 @@
       chainSelect.append(option);
     });
     chainSelect.addEventListener("change", (event) => activateChain(event.target.value));
+  }
+
+  if (antibodySchemeSelect) {
+    antibodySchemeSelect.addEventListener("change", (event) => {
+      currentAntibodyScheme = event.target.value;
+      const activeChainId = (activePanel && activePanel.dataset.chainId) || report.defaultReferenceChain || chainPanels[0].referenceChain;
+      activateChain(activeChainId, false);
+    });
   }
 
   renderWarnings(jobWarnings, jobWarningsTitle, jobWarningList, "Job-level Notes", report.warnings || []);

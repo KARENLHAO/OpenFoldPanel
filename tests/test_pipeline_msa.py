@@ -162,6 +162,8 @@ def test_build_msa_data_uses_display_limit_as_search_limit(monkeypatch, tmp_path
         keep_temp=False,
         contact_cutoff=3.7,
         strong_contact_cutoff=3.2,
+        tm_cluster_cutoff=0.7,
+        disable_tm_clustering=False,
         verbose=False,
     )
     axis = [

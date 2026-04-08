@@ -1,38 +1,24 @@
 # OpenFoldPanel
 
+`OpenFoldPanel` generates a shareable comparison report for one or more protein structure models centered on a reference chain. It combines secondary structure, accessibility, hydropathy, contacts, confidence, optional MSA / conservation, antibody numbering, and optional TM-score clustering into one local batch workflow.
 
-`OpenFoldPanel` turns a set of candidate protein structures into a consistent comparison surface centered on a reference chain. It brings secondary structure, accessibility, hydropathy, contacts, confidence when available, and optional MSA / conservation into a single 2D report so stable regions, disagreements, and interface-level details are easier to review side by side.
+The project is designed for offline and reproducible use. Instead of relying on a hosted service, it writes HTML, PDF, JSON, CSV, summary, and log artifacts that can be archived or passed to downstream analysis scripts.
 
-The project is inspired by FoldScript's presentation ideas, but it is designed for open, local, batch-oriented workflows. Instead of relying on a hosted web service, `OpenFoldPanel` generates shareable artifacts you can archive, inspect in a browser, and plug into larger pipelines.
-
-| Output | Why it is useful |
+| Output | Purpose |
 | --- | --- |
-| `report.html` | Browser-friendly report for quick interactive review |
-| `reference-chain-<CHAIN>.pdf` | Chain-level export suitable for sharing and annotation |
-| `tracks.json` | Structured machine-readable output for downstream processing |
+| `report.html` | Interactive browser report |
+| `reference-chain-<CHAIN>.pdf` | Chain-level export for sharing and annotation |
+| `tracks.json` | Machine-readable report payload |
+| `csv/*.csv` | Job-level statistics tables |
 | `summary.txt` | Short human-readable job summary |
-| `logs.txt` | Detailed run log for debugging and provenance |
+| `logs.txt` | Detailed execution log |
 
-## Core Capabilities
 
-- Accepts a single structure file or batch inputs packaged as archives such as `.zip` and `.tar.gz`.
-- Supports multi-model, multi-chain, and multi-job processing so results from different predictors can be compared in one view.
-- Generates `report.html`, `reference-chain-<CHAIN>.pdf`, `tracks.json`, `summary.txt`, and `logs.txt`.
-- Provides tracks for secondary structure, accessibility, hydropathy, contacts, optional MSA / conservation, and confidence when present.
-- Summarizes sequence-level, secondary-structure-level, and tertiary / quaternary interaction clues in one report.
-- Supports `PDB`, `CIF`, `mmCIF`, and common archive formats so it can be inserted into existing prediction and curation workflows.
+## Quick Start
 
-## OpenFoldPanel Example
+### 1. Create an isolated environment
 
-![OpenFoldPanel example](./image/openfoldscript.png)
-
-Open the full [OpenFoldPanel example](https://karenlhao.github.io/OpenFoldPanel/).
-
-## Installation and Dependencies
-
-Using an isolated `conda` or `mamba` environment is recommended. It makes it easier to keep Python packages, DSSP, and MSA tools in one reproducible setup.
-
-### 1. Create an environment
+Using an isolated `conda` / `mamba` environment is strongly recommended.
 
 ```bash
 mamba create -n openfoldpanel -c conda-forge -c bioconda \
@@ -49,59 +35,103 @@ python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
 
-### 3. Optional enhancement dependencies
+Recommended practice:
 
-The core reporting flow only needs the Python packages in `requirements.txt`, but the tools below significantly improve feature completeness:
+- Use the environment Python consistently, for example `python -m openfoldpanel`.
+- Avoid `pip install --user ...` for this project, because `~/.local/lib/python*/site-packages` can override packages from the active environment.
+- If you suspect user-site package interference, run with `PYTHONNOUSERSITE=1`.
 
-- `mkdssp` / `dssp`
-  Used for more reliable secondary-structure and accessibility calculation. If unavailable, the program falls back to rough geometry-based estimates so reports can still be generated, but DSSP is more accurate.
-- `blastp` or `mmseqs`
-  Used for homolog search.
-- `clustalo`
-  Used for multiple-sequence alignment and conservation scoring.
+### 3. Run the minimal pipeline
 
-If you want these tools in the same environment, continue with:
+```bash
+python -m openfoldpanel \
+  --input ./model.pdb \
+  --outdir ./out
+```
+
+### 4. Open the results
+
+Each job writes a dedicated subdirectory under `--outdir`, containing at least:
+
+- `report.html`
+- `tracks.json`
+- `csv/`
+- `summary.txt`
+- `logs.txt`
+
+## Main Entry Points
+
+### Preferred entry point: raw CLI
+
+The raw CLI exposes the full parameter set:
+
+```bash
+python -m openfoldpanel --input ./models.zip --outdir ./out
+```
+
+This is the recommended interface for routine use, debugging, and scripting.
+
+### Convenience wrapper: `run.py`
+
+`run.py` is a wrapper that:
+
+- writes temporary outputs under `./tmp`
+- copies generated HTML to the current working directory
+- packages HTML / PDF outputs into `OpenFoldPanel_results.tar.gz`
+
+Example:
+
+```bash
+python run.py \
+  --input ./data/protenix_123.zip \
+  --msa-db PDBAA \
+  --max-homologs-displayed 10
+```
+
+Use `run.py` when you want a fixed wrapper workflow. Use `python -m openfoldpanel` when you need the full CLI surface.
+
+## Installation and Dependency Model
+
+### Core Python dependencies
+
+The Python packages listed in `requirements.txt` are required for the base reporting flow.
+
+### Optional external tools
+
+The program can run without some external tools, but feature completeness depends on them.
+
+| Tool | Used for | Behavior when missing |
+| --- | --- | --- |
+| `mkdssp` / `dssp` | Secondary structure and accessibility | Falls back to geometry-based estimation |
+| `blastp` or `mmseqs` | Homolog search | MSA search is skipped |
+| `clustalo` | Multiple sequence alignment | Conservation stage is limited or skipped |
+| `hmmscan` | Antibody numbering via current ANARCI path | Antibody numbering track is skipped |
+| `USalign` / `US-align` | TM-score matrix and clustering | TM-score outputs are skipped and the job may become `partial_success` |
+
+### Install common enhancement tools
 
 ```bash
 mamba install -n openfoldpanel -c conda-forge -c bioconda \
-  blast mmseqs2 clustalo
+  blast mmseqs2 clustalo hmmer
 ```
 
-### 4. Install DSSP (recommended)
+### Install DSSP
 
-If you only want to get the pipeline running quickly, you can temporarily install DSSP from a community package:
+Quick installation:
 
 ```bash
 mamba install -n openfoldpanel -c sbl dssp
 ```
 
-If DSSP is installed into a project-local directory such as `./.local/dssp/bin`, remember to add it to `PATH`:
-
-```bash
-export PATH="$(pwd)/.local/dssp/bin:$PATH"
+If you want to install DSSP  under the project directory, Preparing the DSSP source tree from the project root:
 ```
-
-For a managed production setup, building from the official repository is recommended because paths and versions are easier to keep consistent:
-
-- Official repository: `https://github.com/PDB-REDO/dssp`
-
-This project recommends installing DSSP under the project directory so the environment remains self-contained and easy to reproduce across a team. A suggested layout is:
-
-- Source directory: `./vendor/dssp`
-- Build directory: `./vendor/dssp/build`
-- Install directory: `./.local/dssp`
-
-Prepare the DSSP source tree from the project root:
-
-```bash
 mkdir -p ./vendor
 git clone https://github.com/PDB-REDO/dssp.git ./vendor/dssp
 cd ./vendor/dssp
 ```
 
-Then build and install DSSP into `./.local/dssp`:
-
-```bash
+Then build and install DSSP into ./.local/dssp:
+```
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$(cd ../.. && pwd)/.local/dssp"
@@ -110,33 +140,36 @@ cmake --build build -j"$(nproc)"
 cmake --install build
 ```
 
-After installation, the most common project-local executables are:
-
-- `./.local/dssp/bin/mkdssp`
-- `./.local/dssp/bin/dssp`
-
-### 5. Verify external tools
-
-First, add the project-local DSSP `bin` directory to the current shell `PATH`:
+add it to `PATH`:
 
 ```bash
 export PATH="$(pwd)/.local/dssp/bin:$PATH"
 ```
 
-Then verify that the current environment can resolve these commands directly:
+### Install US-align
+
+For TM-score clustering:
+
+```bash
+conda install -c bioconda usalign
+```
+
+Or build it locally under `./.local/bin/USalign` and then add that directory to `PATH`.
+
+### Verify the current shell
 
 ```bash
 which mkdssp || which dssp
 blastp -version
 mmseqs version
 clustalo --version
+hmmscan -h
+USalign -h || US-align -h
 ```
 
-If they all print version information successfully, the local enhancement toolchain is mostly ready.
+For database download and build workflows, see [`blastdb/README.md`](./blastdb/README.md).
 
-For database download, database building, and `--msa-db` configuration, see [blastdb/README.md](./blastdb/README.md).
-
-## Quick Start
+## Common Run Patterns
 
 ### Single structure file
 
@@ -146,7 +179,7 @@ python -m openfoldpanel \
   --outdir ./out
 ```
 
-### Archive input: multiple structure files at the archive root are treated as one job
+### Multiple structure files inside one archive root -> one job
 
 ```bash
 python -m openfoldpanel \
@@ -154,7 +187,7 @@ python -m openfoldpanel \
   --outdir ./out
 ```
 
-### Archive input: multiple first-level subdirectories at the archive root are treated as multiple jobs
+### Multiple first-level subdirectories inside one archive -> multiple jobs
 
 ```bash
 python -m openfoldpanel \
@@ -162,84 +195,128 @@ python -m openfoldpanel \
   --outdir ./out
 ```
 
-### Enhanced example with MSA
+### Run with MSA
 
 ```bash
 python -m openfoldpanel \
   --input ./models.zip \
   --outdir ./out \
-  --msa-db ./blastdb/swissprot_fasta/uniprot_sprot.fasta \
+  --msa-db ./blastdb/pdbaa/pdbaa \
   --max-homologs-displayed 5 \
   --evalue 1e-6
 ```
 
-## Inputs and Outputs
+### Disable MSA explicitly
 
-### Recommended input conditions
+```bash
+python -m openfoldpanel \
+  --input ./models.zip \
+  --outdir ./out \
+  --disable-msa
+```
 
-`OpenFoldPanel` works especially well for organizing and comparing structures produced by AlphaFold 2 or AlphaFold 3:
+### Disable TM-score clustering explicitly
 
-- AlphaFold 2 commonly outputs `PDB`, while AlphaFold 3 commonly outputs `CIF / mmCIF`; all of these formats are currently supported.
-- If you want to compare multiple models inside one job, it is best if they contain the same number of protein chains and matching chain sequences. The current implementation uses the first successfully parsed model as the reference axis; it will attempt conservative alignment if residue numbering differs, but cleaner inputs give more stable outputs.
-- Monomers, homo-oligomers, and hetero-oligomers are all supported. Structures may include modified residues, nucleic acids, ligands, or ions.
-- For report readability and manual review, keeping a comparison batch to `25` model files or fewer is recommended. The CLI currently accepts a single structure file or archive as input; if you need to compare many results, place them inside one job directory or one archive before running the tool.
+```bash
+python -m openfoldpanel \
+  --input ./models.zip \
+  --outdir ./out \
+  --disable-tm-clustering
+```
 
-### Supported inputs
+This is useful when you do not want missing `USalign` to affect the job status.
+
+## Inputs
+
+### Supported input types
 
 - Structure files: `.pdb`, `.cif`, `.mmcif`
-- Archive formats: `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz`, `.txz`
+- Archives: `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz`, `.txz`
 
 ### Job discovery rules
 
-- A single structure file is itself a job.
-- If the archive root contains multiple first-level subdirectories, each first-level subdirectory is treated as a separate job.
-- If the archive root directly contains multiple structure files, the whole archive is treated as one job.
-- Structure files inside the same job are processed in natural sort order. Non-structure files are ignored and written to the log.
+- A single structure file is treated as one job.
+- If an archive root contains multiple first-level subdirectories, each first-level subdirectory becomes a separate job.
+- If an archive root directly contains multiple structure files, the archive is treated as one job.
+- Structure files inside a job are processed in natural sort order.
+- Non-structure files are ignored and recorded in logs when relevant.
 
-### Typical outputs for each job
+### Recommended input conditions
+
+- Comparing models is easiest when they contain compatible chain composition and similar chain sequences.
+- The first successfully parsed model becomes the reference for chain collection and sequence axis construction.
+- Monomers, homo-oligomers, and hetero-oligomers are supported.
+- Modified residues, ligands, ions, and nucleic acids can be present.
+- For report readability, keeping one comparison batch at `25` models or fewer is recommended.
+
+## Outputs
+
+### Per-job outputs
+
+Typical job artifacts are:
 
 - `report.html`
 - `reference-chain-<CHAIN>.pdf`
 - `tracks.json`
+- `csv/contact-consensus.csv`
+- `csv/tm-score-matrix.csv` when TM-score clustering is available
+- `csv/tm-clusters.csv` when TM-score clustering is available
+- `csv/antibody-summary.csv` when antibody numbering is available
 - `summary.txt`
 - `logs.txt`
 
-If PDF export dependencies are unavailable, the program skips PDF generation but still writes HTML, JSON, and text summaries, and marks the job as `partial_success`.
+
+### Job status
+
+The final job status is one of:
+
+- `success`
+- `partial_success`
+- `failed`
+
+Typical reasons for `partial_success`:
+
+- PDF export was skipped because PDF conversion dependencies were unavailable
+- TM-score clustering was skipped because `USalign` / `US-align` was unavailable
+- some models or reference chains could not be mapped and were skipped
+
+Warnings and reasons are always written to `summary.txt` and `logs.txt`.
 
 ## Key CLI Parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `--input PATH` | None | Input structure file or archive. |
-| `--outdir OUTDIR` | None | Output directory. Each job gets its own result subdirectory. |
-| `--chain ALL\|CHAIN_ID` | `ALL` | Render all protein chains, or analyze only a specific reference chain. |
-| `--columns INT` | `80` | Residue columns shown in each rendered block. |
-| `--font-size INT` | `12` | Base font size for reports and panels. |
-| `--hyd-window INT` | `3` | Smoothing window size for the hydropathy track. |
-| `--msa-db PATH` | None | Local BLAST / MMseqs database prefix, or a protein FASTA file. |
-| `--max-homologs-displayed INT` | `5` | Maximum homolog sequences to retrieve and render. Allowed range: `0-25`. |
-| `--evalue VALUE` | `1e-6` | BLAST / MMseqs significance threshold. Only fixed enumerated values are accepted. |
-| `--disable-msa` | Off | Explicitly disable homolog search, alignment, and conservation calculation. |
-| `--keep-temp` | Off | Keep temporary directories generated during extraction, search, and alignment. |
-| `--contact-cutoff FLOAT` | `3.7` | Weak-contact distance cutoff in angstroms. |
-| `--strong-contact-cutoff FLOAT` | `3.2` | Strong-contact distance cutoff in angstroms. |
-| `--verbose` | Off | Enable verbose logging. |
+| `--input PATH` | None | Input structure file or archive |
+| `--outdir PATH` | None | Output directory |
+| `--chain ALL\|CHAIN_ID` | `ALL` | Render all protein chains or only one selected chain |
+| `--columns INT` | `80` | Residue columns per render block |
+| `--font-size INT` | `12` | Base report font size |
+| `--hyd-window INT` | `3` | Hydropathy smoothing window |
+| `--msa-db PATH` | None | Local BLAST / MMseqs database prefix or protein FASTA |
+| `--max-homologs-displayed INT` | `5` | Number of homolog rows to retrieve and render |
+| `--evalue VALUE` | `1e-6` | BLAST / MMseqs significance threshold |
+| `--disable-msa` | Off | Skip homolog search and conservation stage |
+| `--keep-temp` | Off | Keep temporary extraction and alignment files |
+| `--contact-cutoff FLOAT` | `3.7` | Weak-contact cutoff in angstrom |
+| `--strong-contact-cutoff FLOAT` | `3.2` | Strong-contact cutoff in angstrom |
+| `--tm-cluster-cutoff FLOAT` | `0.7` | Average-linkage TM-score clustering cutoff |
+| `--disable-tm-clustering` | Off | Skip TM-score matrix and cluster assignment |
+| `--verbose` | Off | Enable verbose logging |
 
-A few commonly used parameters deserve extra attention:
+Notes:
 
-- `--chain`
-  The default is `ALL`. The program collects protein chains from the first successfully parsed structure and renders each chain separately. If you only care about one chain, specify it explicitly, for example `--chain B`.
-- `--msa-db`
-  You can pass either a BLAST / MMseqs database prefix or a protein FASTA file directly. For database download, build steps, and examples, see [blastdb/README.md](./blastdb/README.md).
-- `--max-homologs-displayed`
-  Controls how many homologs can be retrieved and how many rows are ultimately rendered. If set to `0`, homolog rows are skipped and only the query row is kept.
-- `--evalue`
-  The currently accepted values are `1e-4`, `1e-5`, `1e-6`, `1e-7`, `1e-8`, `1e-9`, `1e-10`, `1e-11`, and `1e-12`. This threshold controls significance filtering, not the number of returned results.
-- `--disable-msa`
-  If you only want a quick structural panel, or your environment does not include BLAST / MMseqs / Clustal Omega, you can disable the MSA stage directly.
+- `--chain ALL` is the default. The program renders each protein chain from the first successfully parsed structure.
+- `--max-homologs-displayed 0` keeps only the query row and skips homolog display.
+- `--msa-db` accepts either a ready BLAST prefix or a FASTA file. See [`blastdb/README.md`](./blastdb/README.md).
+
+## Example
+
+![OpenFoldPanel example](./image/openfoldscript.png)
+
+Open the full [OpenFoldPanel example](https://karenlhao.github.io/OpenFoldPanel/).
 
 ## Acknowledgements and Reference
 
-`OpenFoldPanel` takes strong inspiration from FoldScript at the product-design level. Thanks to the FoldScript team for showing how clear and useful AI protein-model comparison can be, and for providing a concrete reference point for this project.
+`OpenFoldPanel` takes strong inspiration from FoldScript at the product-design level.
 
 - Robert, X., Guillon, C., Gouet, P. (2025). *FoldScript: a web server for the efficient analysis of AI-generated 3D protein models*. *Nucleic Acids Research*, 53(W1), W277-W282. DOI: [10.1093/nar/gkaf326](https://doi.org/10.1093/nar/gkaf326)

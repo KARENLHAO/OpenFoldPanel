@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-
 from openfoldpanel.constants import (
     ALLOWED_EVALUES,
     DEFAULT_COLUMNS,
@@ -14,6 +13,7 @@ from openfoldpanel.constants import (
     DEFAULT_HYDROPATHY_WINDOW,
     DEFAULT_MAX_HOMOLOGS_DISPLAYED,
     DEFAULT_STRONG_CONTACT_CUTOFF,
+    DEFAULT_TM_CLUSTER_CUTOFF,
     MAX_HOMOLOGS_DISPLAYED_LIMIT,
     validate_evalue,
 )
@@ -43,6 +43,18 @@ def _parse_evalue(value: str) -> str:
         return validate_evalue(value, parameter_name="--evalue")
     except ValueError as exc:
         raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _parse_tm_cluster_cutoff(value: str) -> float:
+    """Parse and validate the TM-score clustering cutoff."""
+
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("--tm-cluster-cutoff must be a floating-point number.") from exc
+    if not 0.0 < parsed <= 1.0:
+        raise argparse.ArgumentTypeError("--tm-cluster-cutoff must be greater than 0 and at most 1.")
+    return parsed
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -85,6 +97,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_STRONG_CONTACT_CUTOFF,
         help="Strong contact cutoff in Angstrom.",
     )
+    parser.add_argument(
+        "--tm-cluster-cutoff",
+        type=_parse_tm_cluster_cutoff,
+        default=DEFAULT_TM_CLUSTER_CUTOFF,
+        help="Average-linkage clustering cutoff on TM-score similarity (0-1].",
+    )
+    parser.add_argument(
+        "--disable-tm-clustering",
+        action="store_true",
+        help="Disable US-align TM-score matrix calculation and cluster assignment.",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging.")
     return parser
 
@@ -111,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
         keep_temp=args.keep_temp,
         contact_cutoff=args.contact_cutoff,
         strong_contact_cutoff=args.strong_contact_cutoff,
+        tm_cluster_cutoff=args.tm_cluster_cutoff,
+        disable_tm_clustering=args.disable_tm_clustering,
         verbose=args.verbose,
     )
     summary = run_pipeline(config, logger)

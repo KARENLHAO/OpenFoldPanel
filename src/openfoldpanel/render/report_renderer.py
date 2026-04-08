@@ -4,26 +4,13 @@ from __future__ import annotations
 
 import html
 import json
-from functools import lru_cache
-from importlib import resources
 
+from openfoldpanel.constants import SUPPORTED_ANTIBODY_NUMBERING
+from openfoldpanel.features.antibody_annotation import antibody_scheme_label
 from openfoldpanel.models import JobPanelData, JobReportData, PipelineConfig, RenderConfig
-from openfoldpanel.render.font_assets import embedded_times_new_roman_css
 from openfoldpanel.render.svg_renderer import render_panel_svg
+from openfoldpanel.render.ui_assets import load_ui_script, load_ui_styles, load_ui_template
 from openfoldpanel.utils.text import humanize_chain_label, humanize_job_status, safe_chain_slug, summarize_msa_database_path
-
-
-UI_PACKAGE = "openfoldpanel.UI"
-UI_STYLE_FILES = (
-    "styles/tokens.css",
-    "styles/base.css",
-    "styles/layout.css",
-    "styles/components.css",
-    "styles/figure.css",
-    "styles/atmosphere.css",
-)
-UI_SCRIPT_FILE = "scripts/report.js"
-UI_TEMPLATE_FILE = "report.template.html"
 
 
 def reference_chain_pdf_name(reference_chain: str) -> str:
@@ -35,7 +22,7 @@ def reference_chain_pdf_name(reference_chain: str) -> str:
 def render_reference_chain_report_svg(panel_data: JobPanelData) -> str:
     """Render one FoldScript-style panel SVG for PDF export."""
 
-    panel_svg, _ = render_panel_svg(panel_data)
+    panel_svg, _ = render_panel_svg(panel_data, antibody_scheme=panel_data.default_antibody_numbering_scheme)
     return panel_svg
 
 
@@ -47,7 +34,7 @@ def render_html_report(report_data: JobReportData, config: PipelineConfig) -> st
         (panel for panel in panel_views if panel["referenceChain"] == report_data.default_reference_chain),
         panel_views[0],
     )
-    template = _load_ui_resource(UI_TEMPLATE_FILE)
+    template = load_ui_template()
     replacements = {
         "__OFP_PAGE_TITLE__": html.escape(f"{report_data.job_name} - OpenFoldPanel Report"),
         "__OFP_REPORT_TITLE__": html.escape(report_data.job_name),
@@ -56,9 +43,10 @@ def render_html_report(report_data: JobReportData, config: PipelineConfig) -> st
         "__OFP_DEFAULT_PANEL_WIDTH__": f'{default_view["panelWidth"]:.2f}',
         "__OFP_LEGEND_CONTACT_STRONG_TEXT__": html.escape(_contact_strong_legend_text(config)),
         "__OFP_LEGEND_CONTACT_WEAK_TEXT__": html.escape(_contact_weak_legend_text(config)),
+        "__OFP_ANTIBODY_LEGEND_HIDDEN__": "" if default_view["availableAntibodySchemes"] else "hidden",
         "__OFP_THEME_VARS__": _build_theme_vars(report_data.chain_panels[0].render_config),
-        "__OFP_INLINE_STYLES__": _load_ui_styles(),
-        "__OFP_INLINE_SCRIPT__": _load_ui_script(),
+        "__OFP_INLINE_STYLES__": load_ui_styles(),
+        "__OFP_INLINE_SCRIPT__": load_ui_script(),
         "__OFP_REPORT_PAYLOAD__": _serialize_json_for_script(
             {
                 "jobName": report_data.job_name,
@@ -71,12 +59,17 @@ def render_html_report(report_data: JobReportData, config: PipelineConfig) -> st
                         "panelWidth": panel["panelWidth"],
                         "summaryItems": panel["summaryItems"],
                         "warnings": panel["warnings"],
+                        "availableAntibodySchemes": panel["availableAntibodySchemes"],
+                        "defaultAntibodyScheme": panel["defaultAntibodyScheme"],
                     }
                     for panel in panel_views
                 ],
+                "defaultAntibodyScheme": panel_views[0]["defaultAntibodyScheme"],
             }
         ),
-        "__OFP_CHAIN_TEMPLATES__": "\n".join(panel["templateMarkup"] for panel in panel_views),
+        "__OFP_CHAIN_TEMPLATES__": "\n".join(
+            markup for panel in panel_views for markup in panel["templateMarkups"]
+        ),
     }
     for token, value in replacements.items():
         template = template.replace(token, value)
@@ -84,28 +77,57 @@ def render_html_report(report_data: JobReportData, config: PipelineConfig) -> st
 
 
 def _build_panel_view(panel_data: JobPanelData, config: PipelineConfig) -> dict[str, object]:
-    panel_svg, layout = render_panel_svg(panel_data)
+    available_antibody_schemes = [
+        scheme for scheme in SUPPORTED_ANTIBODY_NUMBERING if scheme in panel_data.antibody_numberings
+    ]
+    template_schemes = available_antibody_schemes or [panel_data.default_antibody_numbering_scheme]
+    default_antibody_scheme = (
+        panel_data.default_antibody_numbering_scheme
+        if panel_data.default_antibody_numbering_scheme in template_schemes
+        else template_schemes[0]
+    )
+    template_markups: list[str] = []
+    panel_width = 0.0
+    for scheme in template_schemes:
+        panel_svg, layout = render_panel_svg(panel_data, antibody_scheme=scheme)
+        if panel_width == 0.0:
+            panel_width = layout.width
+        template_markups.append(
+            _render_chain_template(
+                reference_chain=panel_data.reference_chain,
+                chain_label=humanize_chain_label(panel_data.reference_chain),
+                panel_width=layout.width,
+                panel_svg=_strip_xml_declaration(panel_svg),
+                antibody_scheme=scheme,
+            )
+        )
     chain_label = humanize_chain_label(panel_data.reference_chain)
     return {
         "referenceChain": panel_data.reference_chain,
         "chainLabel": chain_label,
-        "panelWidth": round(layout.width, 2),
+        "panelWidth": round(panel_width, 2),
         "summaryItems": _build_summary_items(panel_data, config),
         "warnings": list(panel_data.warnings),
-        "templateMarkup": _render_chain_template(
-            reference_chain=panel_data.reference_chain,
-            chain_label=chain_label,
-            panel_width=layout.width,
-            panel_svg=_strip_xml_declaration(panel_svg),
-        ),
+        "availableAntibodySchemes": list(available_antibody_schemes),
+        "defaultAntibodyScheme": default_antibody_scheme,
+        "templateMarkups": template_markups,
     }
 
 
-def _render_chain_template(*, reference_chain: str, chain_label: str, panel_width: float, panel_svg: str) -> str:
+def _render_chain_template(
+    *,
+    reference_chain: str,
+    chain_label: str,
+    panel_width: float,
+    panel_svg: str,
+    antibody_scheme: str,
+) -> str:
     return (
-        f'<template id="ofp-chain-{safe_chain_slug(reference_chain)}" '
+        f'<template id="ofp-chain-{safe_chain_slug(reference_chain)}-{safe_chain_slug(antibody_scheme)}" '
         f'data-chain-figure="{html.escape(reference_chain)}" '
         f'data-chain-label="{html.escape(chain_label)}" '
+        f'data-antibody-scheme="{html.escape(antibody_scheme)}" '
+        f'data-antibody-scheme-label="{html.escape(antibody_scheme_label(antibody_scheme))}" '
         f'data-panel-width="{panel_width:.2f}">'
         f"{panel_svg}"
         "</template>"
@@ -235,18 +257,3 @@ def _build_theme_vars(config: RenderConfig) -> str:
             f"  --ofp-color-atmosphere: {colors['accent_border']};",
         ]
     )
-
-
-@lru_cache(maxsize=1)
-def _load_ui_styles() -> str:
-    return "\n\n".join([embedded_times_new_roman_css(), *(_load_ui_resource(path) for path in UI_STYLE_FILES)])
-
-
-@lru_cache(maxsize=1)
-def _load_ui_script() -> str:
-    return _load_ui_resource(UI_SCRIPT_FILE)
-
-
-@lru_cache(maxsize=None)
-def _load_ui_resource(relative_path: str) -> str:
-    return resources.files(UI_PACKAGE).joinpath(relative_path).read_text(encoding="utf-8")
